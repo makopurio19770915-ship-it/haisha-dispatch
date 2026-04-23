@@ -1,0 +1,12 @@
+# Render.com 用（GitHub 連携後、ダッシュボードで MONGODB_URI を追加してください）
+services:
+  - type: web
+    name: dispatch-manager
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # ダッシュボードで追加: MONGODB_URI（MongoDB Atlas の接続文字列）

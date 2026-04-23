@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>配車管理システム</title>
+  <style>
+    /* ===== Schedule Tab ===== */
+    .schedule-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .schedule-table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 900px;
+      background: white;
+      font-size: 12px;
+    }
+    .schedule-table th {
+      background: var(--primary);
+      color: white;
+      padding: 10px 12px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 12px;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .schedule-table th.col-date { min-width: 80px; }
+    .schedule-table th.col-cross { background: #1d4ed8; }
+    .schedule-table th.col-bus   { background: #0f766e; }
+    .schedule-table th.col-small { background: #92400e; }
+    .schedule-table th.col-big   { background: #6b21a8; }
+    .schedule-table th.col-sys   { background: #166534; }
+    .schedule-table tr.month-sep td { background: var(--primary) !important; color: white; font-weight: 700; font-size: 13px; padding: 8px 14px; }
+
+    .schedule-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--gray-200);
+      vertical-align: top;
+      min-width: 180px;
+    }
+    .schedule-table td.td-date {
+      background: var(--gray-50);
+      text-align: center;
+      font-weight: 600;
+      min-width: 72px;
+      white-space: nowrap;
+      position: sticky;
+      left: 0;
+      z-index: 5;
+      border-right: 2px solid var(--gray-300);
+    }
+    .schedule-table tr.today td { background: #fefce8; }
+    .schedule-table tr.today td.td-date { background: #fef08a; }
+    .schedule-table tr.weekend td { background: #fafafa; }
+    .schedule-table tr.weekend td.td-date { background: #fee2e2; color: var(--danger); }
+    .schedule-table tr.sunday td.td-date { background: #fee2e2; }
+
+    .sched-entry {
+      padding: 5px 7px;
+      border-radius: 5px;
+      margin-bottom: 5px;
+      line-height: 1.5;
+    }
+    .sched-entry:last-child { margin-bottom: 0; }
+    .sched-entry.cross { background: #eff6ff; border-left: 3px solid #3b82f6; }
+    .sched-entry.bus   { background: #f0fdfa; border-left: 3px solid #14b8a6; }
+    .sched-entry.small { background: #fffbeb; border-left: 3px solid #f59e0b; }
+    .sched-entry.big   { background: #faf5ff; border-left: 3px solid #a855f7; }
+    .sched-entry.empty-cell { color: var(--gray-300); font-size: 11px; text-align: center; padding: 4px; }
+    .sched-entry.sys-req  { background: #f0fdf4; border-left: 3px solid #16a34a; }
+    .sched-entry.sys-pend { background: #fffbeb; border-left: 3px solid #f59e0b; }
+
+    .entry-time { font-size: 11px; font-weight: 700; color: var(--gray-500); margin-bottom: 2px; }
+    .entry-route { font-size: 12px; font-weight: 600; color: var(--gray-900); }
+    .entry-meta { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
+    .entry-note { font-size: 10px; color: #9ca3af; margin-top: 1px; }
+
+    .day-num { font-size: 16px; font-weight: 700; display: block; }
+    .day-label { font-size: 10px; font-weight: 500; }
+
+    .schedule-legend {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 14px; font-size: 12px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .legend-dot {
+      width: 12px; height: 12px; border-radius: 3px;
+    }
+
+    .sched-month-nav {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+    }
+    .sched-month-nav h2 { font-size: 18px; font-weight: 700; }
+  </style>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1e40af;
+      --primary-light: #3b82f6;
+      --primary-bg: #eff6ff;
+      --success: #16a34a;
+      --success-bg: #f0fdf4;
+      --warning: #d97706;
+      --warning-bg: #fffbeb;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --radius: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray-100);
+      color: var(--gray-900);
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .app-header {
+      background: var(--primary);
+      color: white;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 56px;
+      box-shadow: var(--shadow-md);
+    }
+    .app-header .logo { font-size: 20px; }
+    .app-header h1 { font-size: 17px; font-weight: 600; letter-spacing: 0.02em; }
+
+    /* Tabs */
+    .tabs {
+      background: white;
+      border-bottom: 1px solid var(--gray-200);
+      padding: 0 24px;
+      display: flex;
+      gap: 4px;
+    }
+    .tab-btn {
+      padding: 14px 20px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-500);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tab-btn:hover { color: var(--primary-light); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* Main */
+    .main { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Card */
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+
+    /* Form */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 13px; font-weight: 500; color: var(--gray-700); }
+    label span.req { color: var(--danger); margin-left: 2px; }
+    input, select, textarea {
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius);
+      padding: 9px 12px;
+      font-size: 14px;
+      color: var(--gray-900);
+      width: 100%;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #1e3a8a; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: white; color: var(--danger); border-color: var(--danger); }
+    .btn-danger:hover { background: var(--danger-bg); }
+    .btn-ghost { background: white; color: var(--gray-700); border-color: var(--gray-300); }
+    .btn-ghost:hover { background: var(--gray-50); }
+    .btn-sm { padding: 5px 12px; font-size: 13px; }
+    .btn-form { margin-top: 8px; }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge-pending   { background: var(--warning-bg); color: var(--warning); }
+    .badge-confirmed { background: var(--primary-bg); color: var(--primary); }
+    .badge-done      { background: var(--success-bg); color: var(--success); }
+    .badge-cancelled { background: var(--gray-100); color: var(--gray-500); }
+
+    /* Request list */
+    .request-list { display: flex; flex-direction: column; gap: 12px; }
+    .request-item {
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+      transition: box-shadow 0.15s;
+    }
+    .request-item:hover { box-shadow: var(--shadow-md); }
+    .request-item.status-cancelled { opacity: 0.55; }
+    .req-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+    .req-id { font-size: 12px; color: var(--gray-500); }
+    .req-datetime { font-size: 13px; font-weight: 600; color: var(--gray-900); }
+    .req-route {
+      font-size: 14px; color: var(--gray-700);
+      display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+    }
+    .req-route .arrow { color: var(--gray-300); }
+    .req-detail { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+    .req-assign {
+      font-size: 12px; color: var(--primary);
+      background: var(--primary-bg);
+      padding: 4px 10px; border-radius: var(--radius);
+      margin-top: 6px; display: inline-block;
+    }
+    .req-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .btn-delete-req {
+      background: none; border: 1px solid var(--gray-200); border-radius: var(--radius);
+      padding: 4px 8px; font-size: 14px; cursor: pointer; color: var(--gray-400);
+      transition: all 0.15s; line-height: 1;
+    }
+    .btn-delete-req:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center; padding: 48px 24px;
+      color: var(--gray-500); font-size: 14px;
+    }
+    .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
+
+    /* Master list */
+    .master-section { margin-bottom: 32px; }
+    .master-section h3 { font-size: 14px; font-weight: 600; color: var(--gray-700); margin-bottom: 12px; }
+    .master-add { display: flex; gap: 8px; margin-bottom: 14px; align-items: flex-end; }
+    .master-add input { max-width: 220px; }
+    .master-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .master-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; background: var(--gray-100);
+      border-radius: 999px; font-size: 13px; color: var(--gray-700);
+    }
+    .master-tag .del-btn {
+      background: none; border: none; cursor: pointer;
+      color: var(--gray-400); font-size: 16px; line-height: 1;
+      padding: 0; display: flex; align-items: center;
+      transition: color 0.1s;
+    }
+    .master-tag .del-btn:hover { color: var(--danger); }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: white; border-radius: 12px;
+      width: 100%; max-width: 520px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--gray-100);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h2 { font-size: 16px; font-weight: 600; }
+    .modal-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 22px; color: var(--gray-400); line-height: 1;
+    }
+    .modal-close:hover { color: var(--gray-700); }
+    .modal-body { padding: 20px 24px; }
+    .modal-info {
+      background: var(--gray-50); border-radius: var(--radius);
+      padding: 14px 16px; margin-bottom: 20px; font-size: 13px;
+      line-height: 1.8; color: var(--gray-700);
+    }
+    .modal-info strong { color: var(--gray-900); }
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--gray-100);
+      display: flex; justify-content: flex-end; gap: 10px;
+    }
+
+    /* Toast */
+    .toast-container {
+      position: fixed; bottom: 24px; right: 24px;
+      display: flex; flex-direction: column; gap: 8px; z-index: 200;
+    }
+    .toast {
+      padding: 12px 18px; border-radius: var(--radius);
+      font-size: 14px; font-weight: 500; color: white;
+      box-shadow: var(--shadow-md);
+      animation: slideIn 0.25s ease;
+    }
+    .toast.success { background: var(--success); }
+    .toast.error   { background: var(--danger); }
+    @keyframes slideIn {
+      from { transform: translateX(60px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* Counter badge in tab */
+    .tab-count {
+      background: var(--primary);
+      color: white;
+      border-radius: 999px;
+      font-size: 11px;
+      padding: 1px 7px;
+      font-weight: 600;
+    }
+    .tab-btn.active .tab-count { background: var(--primary-light); }
+
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .req-actions { width: 100%; }
+      .master-add { flex-wrap: wrap; }
+    }
+
+    /* ===== Quick Place Selector ===== */
+    .place-quick {
+      display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;
+    }
+    .place-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 3px 10px; background: var(--gray-100);
+      border: 1px solid var(--gray-200); border-radius: 999px;
+      font-size: 12px; color: var(--gray-700); cursor: pointer;
+      transition: all 0.15s; font-family: inherit;
+    }
+    .place-chip:hover { background: var(--primary-bg); border-color: var(--primary-light); color: var(--primary); }
+
+    /* ===== Address Input Helpers ===== */
+    .addr-helpers { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+    .addr-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      border: 1px solid var(--gray-300); background: white;
+      color: var(--gray-700); transition: all 0.15s; font-family: inherit;
+    }
+    .addr-btn:hover { border-color: var(--primary-light); color: var(--primary); background: var(--primary-bg); }
+    .addr-btn.active { border-color: var(--primary); color: var(--primary); background: var(--primary-bg); }
+
+    .addr-panel {
+      display: none; margin-top: 8px;
+      border: 1px solid var(--gray-200); border-radius: var(--radius);
+      background: var(--gray-50); padding: 12px;
+    }
+    .addr-panel.open { display: block; }
+    .addr-panel-title { font-size: 12px; font-weight: 600; color: var(--gray-700); margin-bottom: 8px; }
+    .addr-url-row { display: flex; gap: 6px; }
+    .addr-url-row input { flex: 1; font-size: 13px; padding: 7px 10px; }
+
+    .ocr-drop {
+      border: 2px dashed var(--gray-300); border-radius: var(--radius);
+      padding: 20px; text-align: center; cursor: pointer;
+      transition: all 0.15s; font-size: 13px; color: var(--gray-500);
+    }
+    .ocr-drop:hover, .ocr-drop.drag { border-color: var(--primary-light); background: var(--primary-bg); color: var(--primary); }
+    .ocr-drop .drop-icon { font-size: 26px; margin-bottom: 4px; }
+
+    .ocr-preview { margin-top: 10px; }
+    .ocr-preview img { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 6px; display: block; margin-bottom: 10px; border: 1px solid var(--gray-200); }
+    .ocr-result-label { font-size: 12px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
+    .ocr-lines { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; margin-bottom: 8px; }
+    .ocr-line {
+      font-size: 13px; padding: 6px 10px; background: white;
+      border: 1px solid var(--gray-200); border-radius: 6px;
+      color: var(--gray-900); cursor: pointer; transition: all 0.12s;
+      word-break: break-all; line-height: 1.5; user-select: none;
+    }
+    .ocr-line:hover { border-color: var(--primary-light); background: var(--primary-bg); }
+    .ocr-line.selected { border-color: var(--primary); background: var(--primary-bg); color: var(--primary); font-weight: 500; }
+    .ocr-line.selected::before { content: '✓ '; }
+    .ocr-progress {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--gray-500); margin: 10px 0;
+    }
+    .ocr-spinner {
+      width: 18px; height: 18px; border: 2px solid var(--gray-200);
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .addr-extracted {
+      display: flex; align-items: flex-start; gap: 8px; margin-top: 8px;
+      padding: 8px 12px; background: var(--success-bg);
+      border: 1px solid #bbf7d0; border-radius: var(--radius);
+      font-size: 13px; color: #166534; font-weight: 500; word-break: break-all;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+
+<header class="app-header">
+  <span class="logo">🚗</span>
+  <h1 data-i18n="appTitle">配車管理システム</h1>
+  <button id="lang-toggle" onclick="setLang(currentLang==='ja'?'vi':'ja')"
+    style="margin-left:auto;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:999px;padding:5px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:background 0.15s;"
+    onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+    🇻🇳 Tiếng Việt
+  </button>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('form')" id="tab-form">
+    <span data-i18n="tabForm">📋 配車依頼</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('manage')" id="tab-manage">
+    <span data-i18n="tabManage">📦 依頼管理</span>
+    <span class="tab-count" id="pending-count">0</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('master')" id="tab-master">
+    <span data-i18n="tabMaster">⚙️ マスタ管理</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('schedule')" id="tab-schedule">
+    <span data-i18n="tabSchedule">📅 月間スケジュール</span>
+  </button>
+</nav>
+
+<main class="main">
+
+  <!-- ========== 配車依頼フォーム ========== -->
+  <div class="tab-panel active" id="panel-form">
+    <div class="card">
+      <div class="card-title" data-i18n="formTitle">配車依頼フォーム</div>
+      <datalist id="places-datalist"></datalist>
+      <form id="request-form" onsubmit="submitRequest(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label><span data-i18n="labelRequester">申請者名</span> <span class="req">*</span></label>
+            <input type="text" id="f-requester" data-i18n-ph="phRequester" placeholder="例：山田 太郎" required />
+          </div>
+          <div class="form-group">
+            <label><span data-i18n="labelPassengers">乗車人数</span> <span class="req">*</span></label>
+            <input type="number" id="f-passengers" data-i18n-ph="phPassengers" min="1" max="99" placeholder="例：3" required />
+          </div>
+          <div class="form-group">
+            <label><span data-i18n="labelPickup">乗車日時</span> <span class="req">*</span></label>
+            <input type="datetime-local" id="f-pickup-dt" required />
+          </div>
+          <div class="form-group">
+            <label data-i18n="labelReturn">返車予定日時</label>
+            <input type="datetime-local" id="f-return-dt" />
+          </div>
+          <div class="form-group">
+            <label><span data-i18n="labelFrom">出発地</span> <span class="req">*</span></label>
+            <input type="text" id="f-from" data-i18n-ph="phFrom" placeholder="例：本社" list="places-datalist" autocomplete="off" required />
+            <div class="place-quick" id="quick-from"></div>
+          </div>
+          <div class="form-group">
+            <label><span data-i18n="labelTo">目的地</span> <span class="req">*</span></label>
+            <input type="text" id="f-to" data-i18n-ph="phTo" placeholder="例：東京駅、または下のボタンで取得" list="places-datalist" autocomplete="off" required />
+            <div class="place-quick" id="quick-to"></div>
+            <div class="addr-helpers">
+              <button type="button" class="addr-btn" id="btn-maps" onclick="toggleAddrPanel('maps')"><span data-i18n="btnMapsUrl">📍 Google Maps URLから取得</span></button>
+              <button type="button" class="addr-btn" id="btn-ocr"  onclick="toggleAddrPanel('ocr')"><span data-i18n="btnOcr">📷 写真から読み取り</span></button>
+            </div>
+
+            <!-- Google Maps URL パネル -->
+            <div class="addr-panel" id="panel-maps">
+              <div class="addr-panel-title" data-i18n="mapsTitle">Google Maps の URL をペーストしてください</div>
+              <p style="font-size:11px;color:var(--gray-500);margin-bottom:8px;">💡 URLでも住所テキストでもそのままペーストできます</p>
+              <div class="addr-url-row">
+                <input type="text" id="maps-url-input" data-i18n-ph="mapsPh" placeholder="https://maps.google.com/... または住所テキスト" />
+                <button type="button" class="btn btn-primary btn-sm" onclick="extractFromMapsUrl()"><span data-i18n="btnFetch">取得</span></button>
+              </div>
+              <div id="maps-result"></div>
+            </div>
+
+            <!-- OCR パネル -->
+            <div class="addr-panel" id="panel-ocr">
+              <div class="addr-panel-title" data-i18n="ocrTitle">住所が写った写真をアップロードしてください</div>
+              <div class="ocr-drop" id="ocr-drop" onclick="document.getElementById('ocr-file').click()"
+                   ondragover="event.preventDefault();this.classList.add('drag')"
+                   ondragleave="this.classList.remove('drag')"
+                   ondrop="handleOcrDrop(event)">
+                <div class="drop-icon">🖼️</div>
+                <span data-i18n="ocrDrop">クリックまたはドラッグ＆ドロップで画像を選択</span>
+              </div>
+              <input type="file" id="ocr-file" accept="image/*" style="display:none" onchange="handleOcrFile(this.files[0])" />
+              <div id="ocr-progress" style="display:none" class="ocr-progress">
+                <div class="ocr-spinner"></div>
+                <span id="ocr-status"></span>
+              </div>
+              <div id="ocr-output" style="display:none" class="ocr-preview">
+                <img id="ocr-img" src="" alt="preview" />
+                <div class="ocr-result-label">📝 読み取り結果 — <span style="font-weight:400;color:var(--gray-500);">使いたい行をクリックして選択してください</span></div>
+                <div class="ocr-lines" id="ocr-lines"></div>
+                <div style="font-size:12px;font-weight:600;color:var(--gray-700);margin-bottom:4px;">✏️ 目的地として入力する住所（選択または手入力）</div>
+                <div style="display:flex;gap:6px;margin-bottom:8px;">
+                  <input type="text" id="ocr-edit-input" placeholder="行を選択するか、ここに直接入力..."
+                    style="flex:1;font-size:13px;padding:8px 10px;" />
+                  <button type="button" class="btn btn-success btn-sm" onclick="applyOcrResult()">✅ 入力</button>
+                </div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="applyOcrAll()">全文をコピー</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="clearOcrSelection()">選択解除</button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="resetOcr()"><span data-i18n="btnRetryOcr">やり直す</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group full">
+            <label data-i18n="labelNotes">備考</label>
+            <textarea id="f-notes" data-i18n-ph="phNotes" placeholder="特記事項があれば入力してください"></textarea>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-form" data-i18n="btnSubmit">依頼を申請する</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========== 依頼管理 ========== -->
+  <div class="tab-panel" id="panel-manage">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--gray-100);">
+        <div class="card-title" style="margin:0; padding:0; border:none;" data-i18n="manageTitle">依頼一覧</div>
+        <div style="display:flex; gap:8px;">
+          <select id="filter-status" onchange="renderRequests()" style="width:auto; font-size:13px; padding:6px 10px;">
+            <option value="">すべて</option>
+            <option value="申請中">申請中</option>
+            <option value="確定">確定</option>
+            <option value="完了">完了</option>
+            <option value="キャンセル">キャンセル</option>
+          </select>
+
+        </div>
+      </div>
+      <div class="request-list" id="request-list">
+        <div class="empty-state"><div class="icon">📭</div>依頼はまだありません</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== マスタ管理 ========== -->
+  <div class="tab-panel" id="panel-master">
+    <div class="card">
+      <div class="card-title" data-i18n="masterTitle">マスタ管理</div>
+
+      <div class="master-section">
+        <h3 data-i18n="masterVehicles">🚗 車両</h3>
+        <div class="master-add">
+          <div class="form-group" style="flex:1;">
+            <input type="text" id="vehicle-name" data-i18n-ph="phVehicle" placeholder="例：トヨタ ハイエース（7人乗り）" />
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="addMaster('vehicles', 'vehicle-name')" data-i18n="btnAdd">追加</button>
+        </div>
+        <div class="master-tags" id="vehicle-tags"></div>
+      </div>
+
+      <div class="master-section">
+        <h3 data-i18n="masterDrivers">👤 ドライバー</h3>
+        <div class="master-add">
+          <div class="form-group" style="flex:1;">
+            <input type="text" id="driver-name" data-i18n-ph="phDriver" placeholder="例：田中 一郎" />
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="addMaster('drivers', 'driver-name')" data-i18n="btnAdd">追加</button>
+        </div>
+        <div class="master-tags" id="driver-tags"></div>
+      </div>
+
+      <div class="master-section">
+        <h3 data-i18n="masterPlaces">📍 よく行く場所</h3>
+        <div class="master-add">
+          <div class="form-group" style="flex:1;">
+            <input type="text" id="place-name" data-i18n-ph="phPlace" placeholder="例：本社、空港、取引先A" />
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="addMaster('places', 'place-name')" data-i18n="btnAdd">追加</button>
+        </div>
+        <div class="master-tags" id="place-tags"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+  <!-- ========== 月間スケジュール ========== -->
+  <div class="tab-panel" id="panel-schedule">
+    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 24px; margin-bottom:20px;">
+      <div class="sched-month-nav">
+        <h2 id="sched-month-title">2026年4月 車両スケジュール</h2>
+      </div>
+      <div class="schedule-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>CROSS 61LD.08418</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#14b8a6;"></div>BUS 61LD.02599</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div>SMALL TRUCK 61LD.01001</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div>BIG TRUCK 61LD.04922</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#16a34a;"></div><span data-i18n="legendConfirmed">確定済み依頼</span></div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border:1px solid #d97706;"></div><span data-i18n="legendPending">申請中依頼</span></div>
+        <div class="legend-item" style="margin-left:auto;">
+          <span style="font-size:11px;color:var(--gray-500);"><span data-i18n="legendToday" style="background:#fef08a;padding:1px 6px;border-radius:3px;">今日</span> / <span data-i18n="legendWeekend" style="background:#fee2e2;padding:1px 6px;border-radius:3px;">土日</span></span>
+        </div>
+      </div>
+      <div class="schedule-wrap">
+        <table class="schedule-table" id="schedule-table">
+          <thead>
+            <tr>
+              <th class="col-date" id="th-date">日付</th>
+              <th class="col-cross">🚗 CROSS<br>61LD.08418</th>
+              <th class="col-bus">🚌 BUS<br>61LD.02599</th>
+              <th class="col-small">🚚 SMALL TRUCK<br>61LD.01001</th>
+              <th class="col-big">🚛 BIG TRUCK<br>61LD.04922</th>
+              <th class="col-sys" id="th-sys">📋 システム申請</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<!-- ========== 割り当てモーダル ========== -->
+<div class="modal-overlay hidden" id="assign-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 data-i18n="assignTitle">車両・ドライバーを割り当てる</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info" id="modal-info"></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-i18n="assignVehicle">車両を選択</label>
+          <select id="assign-vehicle"></select>
+        </div>
+        <div class="form-group">
+          <label data-i18n="assignDriver">ドライバーを選択</label>
+          <select id="assign-driver"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()" data-i18n="btnModalCancel">キャンセル</button>
+      <button class="btn btn-success" onclick="confirmAssign()" data-i18n="btnConfirmAssign">確定する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 完了モーダル ========== -->
+<div class="modal-overlay hidden" id="done-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 data-i18n="doneTitle">案件を完了にする</h2>
+      <button class="modal-close" onclick="closeDoneModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-info" id="done-modal-info"></div>
+      <p style="font-size:14px; color:var(--gray-700);" data-i18n="doneConfirmText">この配車を「完了」にしてよいですか？</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeDoneModal()" data-i18n="btnModalCancel">キャンセル</button>
+      <button class="btn btn-primary" onclick="confirmDone()" data-i18n="btnConfirmDone">完了にする</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ==================== i18n ====================
+const LANGS = {
+  ja: {
+    appTitle: '配車管理システム',
+    langBtn: '🇻🇳 Tiếng Việt',
+    tabForm: '📋 配車依頼',
+    tabManage: '📦 依頼管理',
+    tabMaster: '⚙️ マスタ管理',
+    tabSchedule: '📅 月間スケジュール',
+
+    // Form
+    formTitle: '配車依頼フォーム',
+    labelRequester: '申請者名',
+    labelPassengers: '乗車人数',
+    labelPickup: '乗車日時',
+    labelReturn: '返車予定日時',
+    labelFrom: '出発地',
+    labelTo: '目的地',
+    labelNotes: '備考',
+    phRequester: '例：山田 太郎',
+    phPassengers: '例：3',
+    phFrom: '例：本社',
+    phTo: '例：東京駅、または下のボタンで取得',
+    phNotes: '特記事項があれば入力してください',
+    btnSubmit: '依頼を申請する',
+
+    // Address helpers
+    btnMapsUrl: '📍 Google Maps URLから取得',
+    btnOcr: '📷 写真から読み取り',
+    mapsTitle: 'Google Maps の URL をペーストしてください',
+    mapsPh: 'https://maps.google.com/... または maps.app.goo.gl/...',
+    btnFetch: '取得',
+    ocrTitle: '住所が写った写真をアップロードしてください',
+    ocrDrop: 'クリックまたはドラッグ＆ドロップで画像を選択',
+    ocrReading: '読み取り中...',
+    ocrReadingPct: pct => `読み取り中... ${pct}%`,
+    ocrFirstTime: '読み取り中... (初回は少し時間がかかります)',
+    ocrResultLabel: '読み取り結果（使いたい部分を選んでください）',
+    btnApplyOcr: 'この内容を目的地に入力',
+    btnRetryOcr: 'やり直す',
+
+    // Manage
+    manageTitle: '依頼一覧',
+    filterAll: 'すべて',
+    statusPending: '申請中',
+    statusConfirmed: '確定',
+    statusDone: '完了',
+    statusCancelled: 'キャンセル',
+    btnAssign: '割り当て',
+    btnChange: '変更',
+    btnDone: '完了',
+    btnCancel: 'キャンセル',
+    emptyRequests: '依頼はまだありません',
+    emptyFiltered: '該当する依頼はありません',
+
+    // Master
+    masterTitle: 'マスタ管理',
+    masterVehicles: '🚗 車両',
+    masterDrivers: '👤 ドライバー',
+    masterPlaces: '📍 よく行く場所',
+    phVehicle: '例：トヨタ ハイエース（7人乗り）',
+    phDriver: '例：田中 一郎',
+    phPlace: '例：本社、空港、取引先A',
+    btnAdd: '追加',
+    masterEmpty: 'まだ登録されていません',
+    placesHint: 'よく行く場所',
+
+    // Schedule
+    schedTitle: year => `${year}年`,
+    schedMonth: (y, m) => `${y}年${m}月`,
+    schedColDate: '日付',
+    schedColSys: '📋 システム申請',
+    legendConfirmed: '確定済み依頼',
+    legendPending: '申請中依頼',
+    legendToday: '今日',
+    legendWeekend: '土日',
+    weekdays: ['日','月','火','水','木','金','土'],
+    badgePending: '🕐 申請中',
+    badgeConfirmed: '✔ 確定',
+    badgeDone: '✅ 完了',
+
+    // Assign modal
+    assignTitle: '車両・ドライバーを割り当てる',
+    assignVehicle: '車両を選択',
+    assignDriver: 'ドライバーを選択',
+    assignPlaceholder: '-- 選択してください --',
+    btnConfirmAssign: '確定する',
+
+    // Done modal
+    doneTitle: '案件を完了にする',
+    doneConfirmText: 'この配車を「完了」にしてよいですか？',
+    btnConfirmDone: '完了にする',
+
+    btnModalCancel: 'キャンセル',
+
+    // Toasts / alerts
+    toastSubmitted: '配車依頼を申請しました',
+    toastDateError: '返車予定日時は乗車日時より後にしてください',
+    toastAssigned: (v, d) => `割り当てを確定しました（${v} ／ ${d}）`,
+    toastSelectBoth: '車両とドライバーの両方を選択してください',
+    toastCancelled: '依頼をキャンセルしました',
+    toastDone: '配車を完了にしました',
+    toastAdded: '登録しました',
+    toastDuplicate: 'すでに登録されています',
+    toastEnterName: '名前を入力してください',
+    toastDeleted: '削除しました',
+    toastAddressSet: '目的地を設定しました',
+    toastEnterUrl: 'URLを入力してください',
+    toastUrlError: '住所を読み取れませんでした。URLを確認してください',
+    confirmCancelReq: 'この依頼をキャンセルしますか？',
+    confirmDeleteReq: 'この依頼を完全に削除しますか？（元に戻せません）',
+    toastDeletedReq: '依頼を削除しました',
+    confirmDelete: name => `「${name}」を削除しますか？`,
+    shortUrlWarning: `⚠️ 短縮URLは自動解析できません。<br>Google Mapsアプリで「共有 → リンクをコピー」の代わりに「場所を共有」→「コピー」を使うと通常URLが取得できます。`,
+    ocrError: msg => 'エラーが発生しました: ' + msg,
+    ocrNoText: '（文字が認識できませんでした）',
+
+    // Request card
+    reqSans: '名',
+    reqPerson: '👤',
+    reqPeople: '🧑‍🤝‍🧑',
+  },
+  vi: {
+    appTitle: 'Hệ thống quản lý xe',
+    langBtn: '🇯🇵 日本語',
+    tabForm: '📋 Yêu cầu xe',
+    tabManage: '📦 Quản lý yêu cầu',
+    tabMaster: '⚙️ Danh mục',
+    tabSchedule: '📅 Lịch tháng',
+
+    formTitle: 'Form yêu cầu xe',
+    labelRequester: 'Người yêu cầu',
+    labelPassengers: 'Số người',
+    labelPickup: 'Thời gian đón',
+    labelReturn: 'Thời gian trả xe (dự kiến)',
+    labelFrom: 'Điểm xuất phát',
+    labelTo: 'Điểm đến',
+    labelNotes: 'Ghi chú',
+    phRequester: 'VD: Nguyễn Văn A',
+    phPassengers: 'VD: 3',
+    phFrom: 'VD: Công ty',
+    phTo: 'VD: Sân bay, hoặc dùng nút bên dưới',
+    phNotes: 'Nhập ghi chú nếu có',
+    btnSubmit: 'Gửi yêu cầu',
+
+    btnMapsUrl: '📍 Lấy từ URL Google Maps',
+    btnOcr: '📷 Đọc địa chỉ từ ảnh',
+    mapsTitle: 'Dán URL Google Maps vào đây',
+    mapsPh: 'https://maps.google.com/... hoặc maps.app.goo.gl/...',
+    btnFetch: 'Lấy địa chỉ',
+    ocrTitle: 'Tải ảnh có địa chỉ lên đây',
+    ocrDrop: 'Nhấp hoặc kéo thả ảnh để chọn',
+    ocrReading: 'Đang nhận dạng...',
+    ocrReadingPct: pct => `Đang nhận dạng... ${pct}%`,
+    ocrFirstTime: 'Đang nhận dạng... (lần đầu có thể mất chút thời gian)',
+    ocrResultLabel: 'Kết quả nhận dạng (chỉnh sửa nếu cần)',
+    btnApplyOcr: 'Điền vào ô điểm đến',
+    btnRetryOcr: 'Thử lại',
+
+    manageTitle: 'Danh sách yêu cầu',
+    filterAll: 'Tất cả',
+    statusPending: 'Đang chờ',
+    statusConfirmed: 'Đã xác nhận',
+    statusDone: 'Hoàn thành',
+    statusCancelled: 'Đã hủy',
+    btnAssign: 'Phân công',
+    btnChange: 'Thay đổi',
+    btnDone: 'Hoàn thành',
+    btnCancel: 'Hủy',
+    emptyRequests: 'Chưa có yêu cầu nào',
+    emptyFiltered: 'Không tìm thấy yêu cầu phù hợp',
+
+    masterTitle: 'Quản lý danh mục',
+    masterVehicles: '🚗 Xe',
+    masterDrivers: '👤 Tài xế',
+    masterPlaces: '📍 Địa điểm thường đến',
+    phVehicle: 'VD: CROSS 61LD.08418',
+    phDriver: 'VD: Anh Sinh',
+    phPlace: 'VD: Công ty, Sân bay, Khách hàng A',
+    btnAdd: 'Thêm',
+    masterEmpty: 'Chưa có mục nào',
+    placesHint: 'Địa điểm thường đến',
+
+    schedTitle: year => `Năm ${year}`,
+    schedMonth: (y, m) => `Tháng ${m}/${y}`,
+    schedColDate: 'Ngày',
+    schedColSys: '📋 Yêu cầu hệ thống',
+    legendConfirmed: 'Yêu cầu đã xác nhận',
+    legendPending: 'Yêu cầu đang chờ',
+    legendToday: 'Hôm nay',
+    legendWeekend: 'Cuối tuần',
+    weekdays: ['CN','T2','T3','T4','T5','T6','T7'],
+    badgePending: '🕐 Đang chờ',
+    badgeConfirmed: '✔ Xác nhận',
+    badgeDone: '✅ Hoàn thành',
+
+    assignTitle: 'Phân công xe và tài xế',
+    assignVehicle: 'Chọn xe',
+    assignDriver: 'Chọn tài xế',
+    assignPlaceholder: '-- Vui lòng chọn --',
+    btnConfirmAssign: 'Xác nhận',
+
+    doneTitle: 'Đánh dấu hoàn thành',
+    doneConfirmText: 'Bạn có muốn đánh dấu chuyến này là hoàn thành không?',
+    btnConfirmDone: 'Hoàn thành',
+
+    btnModalCancel: 'Hủy',
+
+    toastSubmitted: 'Đã gửi yêu cầu xe',
+    toastDateError: 'Thời gian trả xe phải sau thời gian đón',
+    toastAssigned: (v, d) => `Đã xác nhận phân công (${v} / ${d})`,
+    toastSelectBoth: 'Vui lòng chọn cả xe và tài xế',
+    toastCancelled: 'Đã hủy yêu cầu',
+    toastDone: 'Đã hoàn thành chuyến xe',
+    toastAdded: 'Đã thêm thành công',
+    toastDuplicate: 'Mục này đã tồn tại',
+    toastEnterName: 'Vui lòng nhập tên',
+    toastDeleted: 'Đã xóa',
+    toastAddressSet: 'Đã đặt điểm đến',
+    toastEnterUrl: 'Vui lòng nhập URL',
+    toastUrlError: 'Không đọc được địa chỉ. Vui lòng kiểm tra URL',
+    confirmCancelReq: 'Bạn có muốn hủy yêu cầu này không?',
+    confirmDeleteReq: 'Bạn có muốn xóa yêu cầu này không? (Không thể hoàn tác)',
+    toastDeletedReq: 'Đã xóa yêu cầu',
+    confirmDelete: name => `Bạn có muốn xóa "${name}" không?`,
+    shortUrlWarning: `⚠️ URL rút gọn không thể phân tích tự động.<br>Trong ứng dụng Google Maps, chọn "Chia sẻ" → "Sao chép liên kết" để lấy URL đầy đủ.`,
+    ocrError: msg => 'Đã xảy ra lỗi: ' + msg,
+    ocrNoText: '（Không nhận dạng được ký tự）',
+
+    reqSans: 'người',
+    reqPerson: '👤',
+    reqPeople: '🧑‍🤝‍🧑',
+  }
+};
+
+let currentLang = localStorage.getItem('dispatchLang') || 'ja';
+function t(key, ...args) {
+  const val = LANGS[currentLang][key];
+  return typeof val === 'function' ? val(...args) : (val ?? key);
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('dispatchLang', lang);
+  applyLang();
+}
+
+function applyLang() {
+  const L = LANGS[currentLang];
+
+  // data-i18n テキスト
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    if (L[key] !== undefined && typeof L[key] !== 'function') el.textContent = L[key];
+  });
+  // data-i18n-ph プレースホルダー
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.dataset.i18nPh;
+    if (L[key] !== undefined) el.placeholder = L[key];
+  });
+
+  // フィルター選択肢
+  const fs = document.getElementById('filter-status');
+  if (fs) {
+    fs.options[0].text = L.filterAll;
+    fs.options[1].text = L.statusPending;
+    fs.options[2].text = L.statusConfirmed;
+    fs.options[3].text = L.statusDone;
+    fs.options[4].text = L.statusCancelled;
+  }
+
+  // 言語ボタン
+  const lb = document.getElementById('lang-toggle');
+  if (lb) lb.textContent = L.langBtn;
+
+  // スケジュールの列ヘッダー
+  const schedDateTh = document.getElementById('th-date');
+  if (schedDateTh) schedDateTh.textContent = L.schedColDate;
+  const schedSysTh = document.getElementById('th-sys');
+  if (schedSysTh) schedSysTh.innerHTML = L.schedColSys;
+
+  // 再描画が必要な動的コンテンツ
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (activePanel) {
+    const id = activePanel.id;
+    if (id === 'panel-manage')   renderRequests();
+    if (id === 'panel-master')   renderMaster();
+    if (id === 'panel-schedule') renderSchedule();
+    renderQuickPlaces();
+  }
+}
+
+// ==================== Excel Schedule Data ====================
+const EXCEL_SCHEDULE = {"2026-04-01":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR HORIE, MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"13:40","to":"","route":"MR TRINH ĐI TTHC","requester":"","purpose":"","note":"A SINH"}],"BUS 61LD.02599":[{"from":"09:00","to":"10:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-02":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"cty Haosi cụm A4, Đường số 3B, KCN Đồng Xoài III","requester":"MR KHÁNH","purpose":"NHẬN","note":"máy ràng cẩn thận a Sinh"},{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Nhận","note":"15PL a Sinh"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"11:00","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":""}]},"2026-04-03":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"13:00","to":"14:30","route":"phụ sx","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:00","to":"","route":"YOSHIDA","requester":"MS THƯƠNG","purpose":"GIAO-NHẬN","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"11:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":""}]},"2026-04-04":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"","to":"","route":"PANA","requester":"MS NHUNG-QC","purpose":"GIAO","note":"mẫu"},{"from":"13:00","to":"14:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"LẤY ỐNG NƯỚC - Thuỳ Trang","requester":"MR THANH-BT","purpose":"NHẬN","note":"A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"07:30","to":"11:30","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-05":{},"2026-04-06":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:00","to":"09:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"12:00","to":"","route":"Tranximex","requester":"Ms Hạnh","purpose":"Giao","note":"Kato - 1PL A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"10:30","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":""},{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-07":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:00","to":"09:00","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"09:00","to":"","route":"BÍCH ĐI HQ","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"10:30","to":"","route":"NGUYÊN SANG","requester":"RD","purpose":"GIAO","note":"khuôn + vật tư"},{"from":"","to":"","route":"FIGLA","requester":"MS NGỌC","purpose":"GIAO","note":""},{"from":"","to":"","route":"OM","requester":"Ms Hạnh","purpose":"Giao-nhận","note":"20 thùng"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"10:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"120 THÙNG"},{"from":"15:30","to":"17:00","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"17:00","to":"18:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-08":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:00","to":"","route":"Yoshida","requester":"Ms thương","purpose":"Giao nhận","note":""},{"from":"13:00","to":"","route":"PANA","requester":"Ms Hạnh","purpose":"Giao","note":"9PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao nhận","note":"12PL 1PL"},{"from":"16:30","to":"18:00","route":"PHỤ SX","requester":"","purpose":"","note":""}]},"2026-04-09":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:00","to":"09:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"12:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":""},{"from":"","to":"","route":"CTY GỖ GIANG ĐIỀN","requester":"MS THƯƠNG","purpose":"NHẬN","note":"mẫu"},{"from":"16:30","to":"18:00","route":"PHỤ SX","requester":"","purpose":"","note":""}]},"2026-04-10":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:30","to":"","route":"PHÒNG XNC","requester":"","purpose":"","note":"MR HORIE MS THẮM"},{"from":"15:00","to":"16:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":"A DƯƠNG"},{"from":"10:00","to":"","route":"ESTEC","requester":"MS VÂN","purpose":"GIAO","note":"45 thùng A DƯƠNG"},{"from":"","to":"","route":"Star Elec","requester":"Ms thương","purpose":"Giao nhận","note":"28 thùng A DƯƠNG"},{"from":"16:30","to":"18:00","route":"PHỤ SX","requester":"","purpose":"","note":"A DƯƠNG"}],"BIG TRUCK 5T 61LD.04922":[{"from":"13:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"120 THÙNG A SINH"},{"from":"","to":"","route":"PANA","requester":"MS HẠNH","purpose":"NHẬN","note":"2PL A SINH"}]},"2026-04-11":{},"2026-04-12":{},"2026-04-13":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN MR HORIE, MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"16:45","to":"","route":"ĐƯA MR YAGYU, NHÂN VIÊN VỀ","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"15:30","to":"","route":"MR HORIE VỀ CĂN HỘ","requester":"","purpose":"","note":""},{"from":"sau đó","to":"","route":"ĐI SÂN BAY NỘI ĐỊA GA T1","requester":"","purpose":"","note":"19:35 bay"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"ROHTO","requester":"MS HẠNH","purpose":"GIAO","note":"A SINH"},{"from":"","to":"","route":"NGUYÊN SANG","requester":"MR THẠNH RD","purpose":"NHẬN","note":"KHUÔN"},{"from":"13:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"09:00","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":"A DƯƠNG"}]},"2026-04-14":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:30","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao","note":"11pl"},{"from":"12:00","to":"","route":"TS MOLYMER","requester":"MS VÂN","purpose":"Giao-Nhận","note":""},{"from":"","to":"","route":"CÓ HS GỬI BIDV ĐẠI LỘ","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"09:30","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao-Nhận","note":"20pl 3pl"},{"from":"13:00","to":"","route":"Yoshida","requester":"Ms thương","purpose":"Giao nhận","note":""},{"from":"16:30","to":"17:00","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"17:00","to":"18:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-15":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"08:00","to":"09:30","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"09:30","to":"","route":"TTHC NỘP HS - QUẦY 24","requester":"","purpose":"","note":""}],"BUS 61LD.02599":[{"from":"10:00","to":"","route":"ĐĂNG KIỂM XE","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"GIAO","note":"15PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"07:30","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"09:00","to":"12:00","route":"LẮP MÁY","requester":"","purpose":"","note":""},{"from":"14:00","to":"18:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-16":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"08:00","to":"","route":"MR YAGYU ĐI ĐỒNG NAI - Mogamiseiki","requester":"","purpose":"","note":"10:30 HỌP"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"14:00","to":"","route":"VSIP 2 - Bến Cát, Bình Dương","requester":"MS THƯƠNG","purpose":"NHẬN","note":"TẤM GỖ"},{"from":"","to":"","route":"PANA","requester":"MS HẠNH","purpose":"NHẬN","note":"TRAY"},{"from":"","to":"","route":"MANG TẤM CAO SU RA HUỲNH VĂN LŨY","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"09:00","to":"","route":"WAHL","requester":"MS VÂN","purpose":"GIAO","note":"4PL"}]},"2026-04-17":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"14:00","to":"","route":"BIDV HÒA PHÚ","requester":"","purpose":"","note":"CHỞ MR YAGYU A DƯƠNG"},{"from":"15:30","to":"","route":"ĐÓN KHÁCH SB QTE → KS BECAMEX (Mr Azuma)","requester":"","purpose":"","note":"17:20 hạ cánh VN3561"},{"from":"","to":"","route":"CẦM BẢNG TÊN ĐÓN KHÁCH","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"16:45","to":"","route":"ĐƯA MR YAGYU, NHÂN VIÊN VỀ","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"08:00","to":"","route":"SHARP (80 thùng)","requester":"MS.VÂN","purpose":"GIAO","note":"A DƯƠNG"},{"from":"11:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":"A SINH"},{"from":"","to":"","route":"MUSASHI","requester":"MS NGỌC RD","purpose":"GIAO","note":"MẪU"}]},"2026-04-18":{"CROSS 61LD.08418":[{"from":"09:50","to":"","route":"ĐÓN KHÁCH TỪ KS BECAMEX → ASTEE","requester":"","purpose":"","note":"A DƯƠNG"},{"from":"13:30","to":"","route":"ĐÓN MR HORIE TỪ CĂN HỘ LÊN CTY","requester":"","purpose":"","note":"A DƯƠNG"},{"from":"16:30","to":"","route":"ĐƯA KHÁCH VỀ KHÁCH SẠN","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"06:00","to":"16:45","route":"ĐƯA ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"08:30","to":"13:00","route":"MR TRINH ĐI CTY GỖ - GIANG ĐIỀN","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"SHARP","requester":"MS.VÂN","purpose":"GIAO","note":"6 thùng"},{"from":"","to":"","route":"SHARP","requester":"MS NHUNG-QC","purpose":"GIAO","note":"MẪU"}]},"2026-04-19":{"CROSS 61LD.08418":[{"from":"08:00","to":"","route":"ĐƯA KHÁCH RA SÂN BAY QTE","requester":"","purpose":"","note":"11:05 BAY"}]},"2026-04-20":{"CROSS 61LD.08418":[{"from":"05:00","to":"","route":"MR YAGYU ĐI SÂN BAY NỘI ĐỊA GA T1","requester":"","purpose":"","note":"7:30 bay a Dương"},{"from":"16:45","to":"","route":"ĐƯA ĐÓN MR HORIE, NHÂN VIÊN VỀ","requester":"","purpose":"","note":""}],"BUS 61LD.02599":[{"from":"06:00","to":"","route":"ĐÓN MR HORIE, NHÂN VIÊN","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"PANA","requester":"MS HẠNH","purpose":"GIAO","note":"10PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"09:00","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":""}]},"2026-04-21":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN MR HORIE, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"15:30","to":"","route":"MR HORIE ĐI SG","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"16:45","to":"","route":"ĐƯA NHÂN VIÊN VỀ","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:30","to":"","route":"HÒA ĐẠT","requester":"MS THƯƠNG","purpose":"NHẬN","note":"30 KHAY"}],"BIG TRUCK 5T 61LD.04922":[{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao-nhận","note":"7PL 9PL"}]},"2026-04-22":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"11:00","to":"","route":"ĐÓN MR HORIE TỪ CĂN HỘ","requester":"","purpose":"","note":""},{"from":"11:30","to":"","route":"MS NHI ĐI ĐỒNG NAI - Tokoseiki VN","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"09:00","to":"14:00","route":"LẮP MÁY","requester":"","purpose":"","note":""},{"from":"15:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"120 THÙNG"}]},"2026-04-23":{"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Nhận","note":"3PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"11:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":""}]},"2026-04-24":{"CROSS 61LD.08418":[{"from":"","to":"","route":"ĐÓN MR YAGYU SB NỘI ĐỊA GA T1","requester":"","purpose":"","note":"18:25 HẠ CÁNH"},{"from":"12:10","to":"","route":"MR HORIE VỀ CĂN HỘ","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"Yuwa (5pl)","requester":"MS.VÂN","purpose":"GIAO","note":""},{"from":"","to":"","route":"CTY GỖ","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"WAHL","requester":"MS VÂN","purpose":"","note":""}]},"2026-04-25":{},"2026-04-26":{},"2026-04-27":{"CROSS 61LD.08418":[{"from":"","to":"","route":"MR YAGYU ĐI SB QTE","requester":"","purpose":"","note":"1H BAY"},{"from":"09:00","to":"","route":"SÂN BAY","requester":"MS ĐÔNG","purpose":"GIAO","note":"841"}],"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"LẮP MÁY","requester":"","purpose":"","note":""},{"from":"","to":"","route":"A DƯƠNG OFF","requester":"","purpose":"","note":""}]},"2026-04-28":{"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"TRANSIMEX","requester":"MS HẠNH","purpose":"GIAO","note":"1PL"},{"from":"13:00","to":"","route":"EIKOU (20 THÙNG)","requester":"MS.VÂN","purpose":"GIAO","note":""},{"from":"14:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"70 thùng A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"A DƯƠNG OFF","requester":"","purpose":"","note":""}]},"2026-04-29":{"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"A DƯƠNG OFF","requester":"","purpose":"","note":""}]},"2026-04-30":{}};
+
+const VEH_KEYS = [
+  { key: 'CROSS 61LD.08418',           cls: 'cross' },
+  { key: 'BUS 61LD.02599',             cls: 'bus'   },
+  { key: 'SMALL TRUCK 1.1T 61LD.01001',cls: 'small' },
+  { key: 'BIG TRUCK 5T 61LD.04922',    cls: 'big'   },
+];
+
+const JP_DAYS = ['日','月','火','水','木','金','土'];
+
+function renderSchedule() {
+  const tbody  = document.getElementById('schedule-tbody');
+  const today  = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // 今月・来月を動的に計算
+  const months = [0, 1].map(offset => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  let html = '';
+
+  for (const { year, month } of months) {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthLabel  = t('schedMonth', year, month + 1);
+    // 月見出し行（全6列スパン）
+    html += `<tr class="month-sep"><td colspan="6">${monthLabel}</td></tr>`;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const mm      = String(month + 1).padStart(2, '0');
+      const dd      = String(day).padStart(2, '0');
+      const dateKey = `${year}-${mm}-${dd}`;
+      const d       = new Date(year, month, day);
+      const dow     = d.getDay();
+      const isToday   = dateKey === todayStr;
+      const isWeekend = dow === 0 || dow === 6;
+      const trClass   = isToday ? 'today' : (isWeekend ? 'weekend' : '');
+      const dowColor  = dow === 0 ? 'color:var(--danger)' : dow === 6 ? 'color:#2563eb' : '';
+      const wdLabel   = t('weekdays')[dow];
+
+      html += `<tr class="${trClass}">`;
+      html += `<td class="td-date">
+        <span class="day-num">${day}</span>
+        <span class="day-label" style="${dowColor}">${wdLabel}</span>
+      </td>`;
+
+      // Excelデータ列 + 確定依頼を対応する車両列に自動挿入
+      const dayData  = EXCEL_SCHEDULE[dateKey] || {};
+      const allReqs  = getSysRequestsForDate(dateKey);
+      const unmatchedReqs = [];
+
+      for (const veh of VEH_KEYS) {
+        const excelSlots = dayData[veh.key] || [];
+        // この列にマッチする確定・申請中依頼を抽出
+        const matched = allReqs.filter(r => matchVehicleCol(r.vehicle, veh.key));
+        if (matched.length > 0) unmatchedReqs.push(...matched.map(r => r.id));
+
+        html += `<td>`;
+        let hasCells = false;
+
+        // Excelエントリ
+        for (const s of excelSlots) {
+          const timeStr   = s.from ? (s.to ? `${s.from} – ${s.to}` : s.from) : '';
+          const metaParts = [s.requester, s.purpose].filter(Boolean).join(' / ');
+          html += `<div class="sched-entry ${veh.cls}">`;
+          if (timeStr)   html += `<div class="entry-time">⏰ ${timeStr}</div>`;
+          html += `<div class="entry-route">${s.route}</div>`;
+          if (metaParts) html += `<div class="entry-meta">${metaParts}</div>`;
+          if (s.note)    html += `<div class="entry-note">📝 ${s.note}</div>`;
+          html += `</div>`;
+          hasCells = true;
+        }
+
+        // この列にマッチしたシステム依頼
+        for (const r of matched) {
+          const isPending = r.status === '申請中';
+          const cls   = isPending ? 'sys-pend' : 'sys-req';
+          const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
+          const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
+          html += `<div class="sched-entry ${cls}">`;
+          html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
+          html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
+          html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
+          if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
+          html += `</div>`;
+          hasCells = true;
+        }
+
+        if (!hasCells) html += `<div class="sched-entry empty-cell">—</div>`;
+        html += `</td>`;
+      }
+
+      // システム申請列：どの車両にもマッチしなかった依頼のみ
+      const unmatched = allReqs.filter(r => !unmatchedReqs.includes(r.id));
+      html += `<td>`;
+      if (unmatched.length === 0) {
+        html += `<div class="sched-entry empty-cell">—</div>`;
+      } else {
+        for (const r of unmatched) {
+          const isPending = r.status === '申請中';
+          const cls   = isPending ? 'sys-pend' : 'sys-req';
+          const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
+          const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
+          html += `<div class="sched-entry ${cls}">`;
+          html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
+          html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
+          html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
+          if (r.vehicle) html += `<div class="entry-note">🚗 ${r.vehicle}${r.driver ? ' ／ ' + r.driver : ''}</div>`;
+          html += `</div>`;
+        }
+      }
+      html += `</td>`;
+
+      html += `</tr>`;
+    }
+  }
+
+  tbody.innerHTML = html;
+}
+
+function getSysRequestsForDate(dateStr) {
+  return state.requests.filter(r => {
+    if (r.status === 'キャンセル') return false;
+    return r.pickupDt && r.pickupDt.slice(0, 10) === dateStr;
+  });
+}
+
+// 車両名がどのExcel列に属するかを判定
+function matchVehicleCol(vehicleName, colKey) {
+  if (!vehicleName) return false;
+  const v = vehicleName.toUpperCase();
+  const c = colKey.toUpperCase();
+  // 車両番号の末尾5桁か車種キーワードで照合
+  const patterns = {
+    'CROSS 61LD.08418':            ['08418', 'CROSS'],
+    'BUS 61LD.02599':              ['02599', 'BUS'],
+    'SMALL TRUCK 1.1T 61LD.01001': ['01001', 'SMALL'],
+    'BIG TRUCK 5T 61LD.04922':     ['04922', 'BIG TRUCK'],
+  };
+  const keywords = patterns[colKey] || [];
+  return keywords.some(kw => v.includes(kw));
+}
+
+// ==================== State ====================
+let state = {
+  requests: [],
+  vehicles: [],
+  drivers: [],
+  places: [],
+  nextId: 1,
+};
+
+let assignTargetId = null;
+let doneTargetId = null;
+
+// ==================== Storage ====================
+async function saveState() {
+  await fetch('/api/state', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state),
+  });
+  if (document.getElementById('panel-schedule').classList.contains('active')) {
+    renderSchedule();
+  }
+}
+
+const COMPANY_VEHICLES = [
+  'CROSS 61LD.08418',
+  'BUS 61LD.02599',
+  'SMALL TRUCK 1.1T 61LD.01001',
+  'BIG TRUCK 5T 61LD.04922',
+];
+const COMPANY_DRIVERS = ['Mr Sinh', 'Mr Duong', 'HORIE'];
+
+async function loadState() {
+  try {
+    const res = await fetch('/api/state');
+    const saved = await res.json();
+    if (saved && saved.requests) {
+      state = saved;
+      let updated = false;
+      for (const v of COMPANY_VEHICLES) {
+        if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
+      }
+      for (const d of COMPANY_DRIVERS) {
+        if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
+      }
+      if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
+      if (updated) await saveState();
+    } else {
+      state.vehicles = [...COMPANY_VEHICLES];
+      state.drivers  = ['Mr Sinh', 'Mr Duong', 'HORIE'];
+      state.places   = ['本社 / Công ty', '空港 / Sân bay'];
+      await saveState();
+    }
+  } catch {
+    state.vehicles = [...COMPANY_VEHICLES];
+    state.drivers  = ['Mr Sinh', 'Mr Duong', 'HORIE'];
+    state.places   = ['本社 / Công ty', '空港 / Sân bay'];
+  }
+}
+
+// ==================== Tab ====================
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'manage')   renderRequests();
+  if (name === 'master')   renderMaster();
+  if (name === 'schedule') renderSchedule();
+}
+
+// ==================== Request Form ====================
+async function submitRequest(e) {
+  e.preventDefault();
+  const pickupDt = document.getElementById('f-pickup-dt').value;
+  const returnDt = document.getElementById('f-return-dt').value;
+
+  if (returnDt && returnDt <= pickupDt) {
+    toast(t('toastDateError'), 'error');
+    return;
+  }
+
+  const req = {
+    id: state.nextId++,
+    requester: document.getElementById('f-requester').value.trim(),
+    passengers: parseInt(document.getElementById('f-passengers').value),
+    pickupDt,
+    returnDt,
+    from: document.getElementById('f-from').value.trim(),
+    to: document.getElementById('f-to').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+    status: '申請中',
+    vehicle: '',
+    driver: '',
+    createdAt: new Date().toISOString(),
+  };
+
+  state.requests.unshift(req);
+  await saveState();
+  document.getElementById('request-form').reset();
+  updatePendingCount();
+  toast(t('toastSubmitted'), 'success');
+}
+
+// ==================== Request List ====================
+function renderRequests() {
+  const list = document.getElementById('request-list');
+  const filter = document.getElementById('filter-status').value;
+  const reqs = filter ? state.requests.filter(r => r.status === filter) : state.requests;
+
+  if (reqs.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">📭</div>${filter ? t('emptyFiltered') : t('emptyRequests')}</div>`;
+    return;
+  }
+
+  // ステータス表示名マップ（現在言語）
+  const statusLabel = { '申請中': t('statusPending'), '確定': t('statusConfirmed'), '完了': t('statusDone'), 'キャンセル': t('statusCancelled') };
+  list.innerHTML = reqs.map(r => {
+    const statusClass = { '申請中':'pending', '確定':'confirmed', '完了':'done', 'キャンセル':'cancelled' }[r.status] || 'pending';
+    const pickupLabel = formatDt(r.pickupDt);
+    const returnLabel = r.returnDt ? ` → ${formatDt(r.returnDt)}` : '';
+    const assignLine = r.vehicle || r.driver
+      ? `<div class="req-assign">🚗 ${r.vehicle || '未選択'} ／ 👤 ${r.driver || '未選択'}</div>`
+      : '';
+    const notesLine = r.notes ? `<div class="req-detail">📝 ${r.notes}</div>` : '';
+
+    let actions = '';
+    if (r.status === '申請中') {
+      actions = `
+        <button class="btn btn-primary btn-sm" onclick="openAssignModal(${r.id})">${t('btnAssign')}</button>
+        <button class="btn btn-danger btn-sm" onclick="cancelRequest(${r.id})">${t('btnCancel')}</button>
+      `;
+    } else if (r.status === '確定') {
+      actions = `
+        <button class="btn btn-ghost btn-sm" onclick="openAssignModal(${r.id})">${t('btnChange')}</button>
+        <button class="btn btn-success btn-sm" onclick="openDoneModal(${r.id})">${t('btnDone')}</button>
+        <button class="btn btn-danger btn-sm" onclick="cancelRequest(${r.id})">${t('btnCancel')}</button>
+      `;
+    }
+
+    return `
+      <div class="request-item status-${statusClass}">
+        <div style="flex:1;">
+          <div class="req-meta">
+            <span class="req-id">#${r.id}</span>
+            <span class="badge badge-${statusClass}">${statusLabel[r.status] || r.status}</span>
+            <span class="req-datetime">📅 ${pickupLabel}${returnLabel}</span>
+          </div>
+          <div class="req-route">
+            <strong>${r.from}</strong>
+            <span class="arrow">→</span>
+            <strong>${r.to}</strong>
+          </div>
+          <div class="req-detail">👤 ${r.requester} ／ 🧑‍🤝‍🧑 ${r.passengers} ${t('reqSans')}</div>
+          ${notesLine}
+          ${assignLine}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;">
+          <div class="req-actions">${actions}</div>
+          <button class="btn-delete-req" onclick="deleteRequest(${r.id})" title="削除">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function cancelRequest(id) {
+  if (!confirm(t('confirmCancelReq'))) return;
+  const req = state.requests.find(r => r.id === id);
+  if (req) { req.status = 'キャンセル'; await saveState(); renderRequests(); updatePendingCount(); toast(t('toastCancelled')); }
+}
+
+async function deleteRequest(id) {
+  if (!confirm(t('confirmDeleteReq'))) return;
+  state.requests = state.requests.filter(r => r.id !== id);
+  await saveState(); renderRequests(); updatePendingCount();
+  toast(t('toastDeletedReq'));
+}
+
+// ==================== Assign Modal ====================
+function openAssignModal(id) {
+  assignTargetId = id;
+  const req = state.requests.find(r => r.id === id);
+  if (!req) return;
+
+  document.getElementById('modal-info').innerHTML = `
+    <strong>#${req.id} ${req.requester}</strong> さんの依頼<br>
+    📅 ${formatDt(req.pickupDt)}${req.returnDt ? ' → ' + formatDt(req.returnDt) : ''}<br>
+    📍 ${req.from} → ${req.to}　🧑‍🤝‍🧑 ${req.passengers}名
+  `;
+
+  const vSel = document.getElementById('assign-vehicle');
+  const dSel = document.getElementById('assign-driver');
+  const ph = t('assignPlaceholder');
+  vSel.innerHTML = `<option value="">${ph}</option>` +
+    state.vehicles.map(v => `<option value="${v}" ${req.vehicle === v ? 'selected' : ''}>${v}</option>`).join('');
+  dSel.innerHTML = `<option value="">${ph}</option>` +
+    state.drivers.map(d => `<option value="${d}" ${req.driver === d ? 'selected' : ''}>${d}</option>`).join('');
+
+  document.getElementById('assign-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('assign-modal').classList.add('hidden');
+  assignTargetId = null;
+}
+
+async function confirmAssign() {
+  const vehicle = document.getElementById('assign-vehicle').value;
+  const driver  = document.getElementById('assign-driver').value;
+  if (!vehicle || !driver) { toast(t('toastSelectBoth'), 'error'); return; }
+
+  const req = state.requests.find(r => r.id === assignTargetId);
+  if (req) {
+    req.vehicle = vehicle;
+    req.driver  = driver;
+    req.status  = '確定';
+    await saveState(); renderRequests(); updatePendingCount(); closeModal();
+    toast(t('toastAssigned', vehicle, driver), 'success');
+  }
+}
+
+// ==================== Done Modal ====================
+function openDoneModal(id) {
+  doneTargetId = id;
+  const req = state.requests.find(r => r.id === id);
+  if (!req) return;
+  document.getElementById('done-modal-info').innerHTML = `
+    <strong>#${req.id} ${req.requester}</strong> さんの依頼<br>
+    🚗 ${req.vehicle} ／ 👤 ${req.driver}
+  `;
+  document.getElementById('done-modal').classList.remove('hidden');
+}
+
+function closeDoneModal() {
+  document.getElementById('done-modal').classList.add('hidden');
+  doneTargetId = null;
+}
+
+async function confirmDone() {
+  const req = state.requests.find(r => r.id === doneTargetId);
+  if (req) {
+    req.status = '完了';
+    await saveState(); renderRequests(); updatePendingCount(); closeDoneModal();
+    toast(t('toastDone'), 'success');
+  }
+}
+
+// ==================== Master ====================
+function renderMaster() {
+  renderTags('vehicle-tags', state.vehicles, 'vehicles');
+  renderTags('driver-tags',  state.drivers,  'drivers');
+  renderTags('place-tags',   state.places,   'places');
+  renderQuickPlaces();
+}
+
+function renderQuickPlaces() {
+  const places = state.places || [];
+
+  // datalist を更新（出発地・目的地で共用）
+  const dl = document.getElementById('places-datalist');
+  if (dl) dl.innerHTML = places.map(p => `<option value="${p}"></option>`).join('');
+
+  // クイック選択チップも更新
+  ['quick-from', 'quick-to'].forEach(elId => {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const targetInput = elId === 'quick-from' ? 'f-from' : 'f-to';
+    if (places.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = places.map(p =>
+      `<button type="button" class="place-chip" onclick="document.getElementById('${targetInput}').value='${p.replace(/'/g,"\\'")}';this.parentElement.querySelectorAll('.place-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected');">📍 ${p}</button>`
+    ).join('');
+  });
+}
+
+function renderTags(containerId, items, key) {
+  const el = document.getElementById(containerId);
+  if (items.length === 0) {
+    el.innerHTML = `<span style="font-size:13px;color:var(--gray-500);">${t('masterEmpty')}</span>`;
+    return;
+  }
+  el.innerHTML = items.map((item, i) => `
+    <div class="master-tag">
+      ${item}
+      <button class="del-btn" onclick="removeMaster('${key}', ${i})" title="削除">×</button>
+    </div>
+  `).join('');
+}
+
+async function addMaster(key, inputId) {
+  const input = document.getElementById(inputId);
+  const val = input.value.trim();
+  if (!val) { toast(t('toastEnterName'), 'error'); return; }
+  if (state[key].includes(val)) { toast(t('toastDuplicate'), 'error'); return; }
+  state[key].push(val);
+  await saveState(); renderMaster(); input.value = '';
+  toast(t('toastAdded'), 'success');
+}
+
+async function removeMaster(key, index) {
+  const name = state[key][index];
+  if (!confirm(t('confirmDelete', name))) return;
+  state[key].splice(index, 1);
+  await saveState(); renderMaster();
+  toast(t('toastDeleted'));
+}
+
+// ==================== Address Helpers ====================
+
+function toggleAddrPanel(name) {
+  const panels = ['maps', 'ocr'];
+  const btns   = { maps: 'btn-maps', ocr: 'btn-ocr' };
+  panels.forEach(p => {
+    const panel = document.getElementById('panel-' + p);
+    const btn   = document.getElementById(btns[p]);
+    if (p === name) {
+      const isOpen = panel.classList.contains('open');
+      panel.classList.toggle('open', !isOpen);
+      btn.classList.toggle('active', !isOpen);
+    } else {
+      panel.classList.remove('open');
+      btn.classList.remove('active');
+    }
+  });
+}
+
+// ---------- Google Maps URL ----------
+function parseGoogleMapsUrl(raw) {
+  try {
+    const u = new URL(raw);
+
+    // /maps/place/PLACE_NAME/... (標準・最も多い形式)
+    const placeM = u.pathname.match(/\/maps\/place\/([^/@]+)/);
+    if (placeM) {
+      const name = decodeURIComponent(placeM[1].replace(/\+/g, ' ')).trim();
+      if (name && name !== 'undefined') return name;
+    }
+
+    // /maps/search/QUERY
+    const searchM = u.pathname.match(/\/maps\/search\/([^/@]+)/);
+    if (searchM) return decodeURIComponent(searchM[1].replace(/\+/g, ' ')).trim();
+
+    // ?q=QUERY または &q=QUERY (古い形式・埋め込み)
+    const q = u.searchParams.get('q');
+    if (q) return q.trim();
+
+    // ?query=... (Google Maps Embed API)
+    const query = u.searchParams.get('query');
+    if (query) return query.trim();
+
+    // /maps/dir/FROM/TO の目的地
+    const dirM = u.pathname.match(/\/maps\/dir\/[^/]+\/([^/@]+)/);
+    if (dirM) return decodeURIComponent(dirM[1].replace(/\+/g, ' ')).trim();
+
+    // destination= パラメータ
+    const dest = u.searchParams.get('destination');
+    if (dest) return dest.trim();
+
+    // !3s で始まるプレースID付きURL内の場所名を探す
+    const dataM = u.pathname.match(/\/place\/([^/!@]+)/);
+    if (dataM) {
+      const name = decodeURIComponent(dataM[1].replace(/\+/g, ' ')).trim();
+      if (name && name.length > 1) return name;
+    }
+
+    // @lat,lng のみ → 座標をそのまま返す
+    const coordM = u.pathname.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (coordM) return `${coordM[1]}, ${coordM[2]}`;
+
+  } catch (_) {}
+  return null;
+}
+
+function showMapsExtracted(resultEl, address) {
+  const safe = address.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  resultEl.innerHTML = `
+    <div class="addr-extracted">
+      <span style="flex:1;">✅ ${address}</span>
+      <button type="button" class="btn btn-success btn-sm" style="flex-shrink:0;" onclick="applyMapsResult('${safe}')">目的地に入力</button>
+    </div>`;
+}
+
+function extractFromMapsUrl() {
+  const raw = document.getElementById('maps-url-input').value.trim();
+  const resultEl = document.getElementById('maps-result');
+  if (!raw) {
+    resultEl.innerHTML = `<div style="font-size:12px;color:var(--danger);margin-top:6px;">${t('toastEnterUrl')}</div>`;
+    return;
+  }
+
+  // URL かどうか判定
+  const isUrl = /^https?:\/\//i.test(raw) || /^maps\.app\./i.test(raw);
+
+  // URLでなければ住所テキストとしてそのまま使用
+  if (!isUrl) {
+    showMapsExtracted(resultEl, raw);
+    return;
+  }
+
+  // 短縮URL → 手動入力フォームを表示
+  if (/maps\.app\.goo\.gl|goo\.gl\/maps/i.test(raw)) {
+    resultEl.innerHTML = `
+      <div style="font-size:12px;color:var(--warning);margin-top:8px;margin-bottom:8px;">${t('shortUrlWarning')}</div>
+      <div style="font-size:12px;color:var(--gray-700);margin-bottom:6px;font-weight:600;">または住所を直接入力：</div>
+      <div class="addr-url-row">
+        <input type="text" id="manual-addr-input" placeholder="例：Lê Thánh Tôn, Bến Nghé, Sài Gòn..." style="font-size:13px;padding:7px 10px;" />
+        <button type="button" class="btn btn-success btn-sm" onclick="applyManualAddr()">入力</button>
+      </div>`;
+    return;
+  }
+
+  // URLパース
+  const address = parseGoogleMapsUrl(raw);
+  if (address) {
+    showMapsExtracted(resultEl, address);
+  } else {
+    // パース失敗 → 手動入力にフォールバック
+    resultEl.innerHTML = `
+      <div style="font-size:12px;color:var(--warning);margin-top:8px;margin-bottom:6px;">⚠️ URLから住所を自動取得できませんでした。住所を直接入力してください：</div>
+      <div class="addr-url-row">
+        <input type="text" id="manual-addr-input" placeholder="住所を入力..." style="font-size:13px;padding:7px 10px;" />
+        <button type="button" class="btn btn-success btn-sm" onclick="applyManualAddr()">入力</button>
+      </div>`;
+  }
+}
+
+function applyManualAddr() {
+  const v = (document.getElementById('manual-addr-input')?.value || '').trim();
+  if (!v) return;
+  applyMapsResult(v);
+}
+
+function applyMapsResult(address) {
+  document.getElementById('f-to').value = address;
+  document.getElementById('panel-maps').classList.remove('open');
+  document.getElementById('btn-maps').classList.remove('active');
+  document.getElementById('maps-url-input').value = '';
+  document.getElementById('maps-result').innerHTML = '';
+  toast(t('toastAddressSet'), 'success');
+}
+
+// Enter キーで取得
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('maps-url-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); extractFromMapsUrl(); }
+  });
+});
+
+// ---------- OCR ----------
+function handleOcrDrop(e) {
+  e.preventDefault();
+  document.getElementById('ocr-drop').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) handleOcrFile(file);
+}
+
+async function handleOcrFile(file) {
+  if (!file) return;
+
+  document.getElementById('ocr-img').src = URL.createObjectURL(file);
+  document.getElementById('ocr-drop').style.display = 'none';
+  document.getElementById('ocr-progress').style.display = 'flex';
+  document.getElementById('ocr-output').style.display = 'none';
+  document.getElementById('ocr-status').textContent = t('ocrFirstTime');
+
+  try {
+    const result = await Tesseract.recognize(file, 'vie+jpn+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          document.getElementById('ocr-status').textContent = t('ocrReadingPct', Math.round(m.progress * 100));
+        }
+      }
+    });
+
+    const rawText = result.data.text || '';
+    // 行ごとに分割・空行を除去
+    const lines = rawText.split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 1);
+
+    renderOcrLines(lines.length ? lines : [t('ocrNoText')]);
+    document.getElementById('ocr-progress').style.display = 'none';
+    document.getElementById('ocr-output').style.display = 'block';
+  } catch (err) {
+    document.getElementById('ocr-status').textContent = t('ocrError', err.message);
+  }
+}
+
+function renderOcrLines(lines) {
+  const container = document.getElementById('ocr-lines');
+  container.innerHTML = lines.map((line, i) =>
+    `<div class="ocr-line" data-idx="${i}" onclick="toggleOcrLine(this)">${line}</div>`
+  ).join('');
+  const input = document.getElementById('ocr-edit-input');
+  if (input) input.value = '';
+}
+
+function toggleOcrLine(el) {
+  el.classList.toggle('selected');
+  syncOcrEditInput();
+}
+
+function syncOcrEditInput() {
+  const selected = [...document.querySelectorAll('.ocr-line.selected')]
+    .map(el => el.textContent.replace(/^✓ /, '').trim())
+    .filter(Boolean);
+  const input = document.getElementById('ocr-edit-input');
+  if (input) input.value = selected.join(' ');
+}
+
+function clearOcrSelection() {
+  document.querySelectorAll('.ocr-line.selected').forEach(el => el.classList.remove('selected'));
+  const input = document.getElementById('ocr-edit-input');
+  if (input) input.value = '';
+}
+
+function applyOcrResult() {
+  const input = document.getElementById('ocr-edit-input');
+  const text = (input?.value || '').trim();
+  if (!text) { toast('住所を入力または行を選択してください', 'error'); return; }
+  document.getElementById('f-to').value = text;
+  closeOcrPanel();
+}
+
+function applyOcrAll() {
+  const all = [...document.querySelectorAll('.ocr-line')]
+    .map(el => el.textContent.replace(/^✓ /, '').trim())
+    .filter(Boolean);
+  const input = document.getElementById('ocr-edit-input');
+  if (input) input.value = all.join(' ');
+}
+
+function closeOcrPanel() {
+  document.getElementById('panel-ocr').classList.remove('open');
+  document.getElementById('btn-ocr').classList.remove('active');
+  resetOcr();
+  toast(t('toastAddressSet'), 'success');
+}
+
+function resetOcr() {
+  document.getElementById('ocr-drop').style.display = '';
+  document.getElementById('ocr-progress').style.display = 'none';
+  document.getElementById('ocr-output').style.display = 'none';
+  document.getElementById('ocr-file').value = '';
+  document.getElementById('ocr-img').src = '';
+  document.getElementById('ocr-lines').innerHTML = '';
+  const editInput = document.getElementById('ocr-edit-input');
+  if (editInput) editInput.value = '';
+}
+
+// ==================== Helpers ====================
+function formatDt(dtStr) {
+  if (!dtStr) return '';
+  const d = new Date(dtStr);
+  const MM = d.getMonth() + 1;
+  const DD = d.getDate();
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const days = ['日','月','火','水','木','金','土'];
+  return `${MM}/${DD}（${days[d.getDay()]}）${hh}:${mm}`;
+}
+
+function updatePendingCount() {
+  const n = state.requests.filter(r => r.status === '申請中').length;
+  document.getElementById('pending-count').textContent = n;
+  document.getElementById('pending-count').style.display = n > 0 ? '' : 'none';
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// キーボードで入力してEnterでも追加できるように
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadState();
+  updatePendingCount();
+  applyLang();
+  renderQuickPlaces();
+
+  document.getElementById('vehicle-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addMaster('vehicles', 'vehicle-name'); }
+  });
+  document.getElementById('driver-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addMaster('drivers', 'driver-name'); }
+  });
+  document.getElementById('place-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addMaster('places', 'place-name'); }
+  });
+
+  // モーダル外クリックで閉じる
+  document.getElementById('assign-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+  document.getElementById('done-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeDoneModal();
+  });
+});
+</script>
+</body>
+</html>
