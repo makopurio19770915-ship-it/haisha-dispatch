@@ -1167,6 +1167,10 @@ function ymdKey(year, monthZero, day) {
   return `${year}-${mm}-${dd}`;
 }
 
+function yyyyMmDd(d) {
+  return ymdKey(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 function uniqMonthLabelsInRange(fromIso, toIso) {
   const parse = s => {
     const [y, m, d] = s.split('-').map(Number);
