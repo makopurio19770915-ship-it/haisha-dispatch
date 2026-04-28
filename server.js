@@ -11,6 +11,18 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1 };
 
+/** 同時POSTで read→write が混ざらないよう直列化（依頼の取りこぼし防止） */
+let mutationQueue = Promise.resolve();
+function enqueueMutation(fn) {
+  const run = () => fn();
+  const p = mutationQueue.then(run, run);
+  mutationQueue = p.then(
+    () => {},
+    () => {}
+  );
+  return p;
+}
+
 let mongoClient = null;
 let mongoDb = null;
 let useMongo = false;
@@ -75,8 +87,41 @@ app.get('/api/state', async (req, res) => {
 
 app.post('/api/state', async (req, res) => {
   try {
-    await writeState(req.body);
+    await enqueueMutation(async () => {
+      await writeState(req.body);
+    });
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** 新規依頼のみサーバー側で追加（同時申請で他者の依頼が消えない） */
+app.post('/api/requests', async (req, res) => {
+  try {
+    const b = req.body || {};
+    await enqueueMutation(async () => {
+      const s = await readState();
+      const id = s.nextId++;
+      const newReq = {
+        id,
+        requester: String(b.requester || '').trim(),
+        passengers: parseInt(b.passengers, 10) || 1,
+        pickupDt: b.pickupDt,
+        returnDt: b.returnDt || '',
+        from: String(b.from || '').trim(),
+        to: String(b.to || '').trim(),
+        notes: String(b.notes || '').trim(),
+        status: '申請中',
+        vehicle: '',
+        driver: '',
+        createdAt: b.createdAt || new Date().toISOString(),
+      };
+      s.requests.unshift(newReq);
+      await writeState(s);
+    });
+    const data = await readState();
+    res.json({ ok: true, state: data });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -896,6 +896,7 @@ const LANGS = {
 
     // Toasts / alerts
     toastSubmitted: '配車依頼を申請しました',
+    toastSubmitError: '申請の保存に失敗しました。ネットワークを確認して再度お試しください。',
     toastDateError: '返車予定日時は乗車日時より後にしてください',
     toastAssigned: (v, d) => `割り当てを確定しました（${v} ／ ${d}）`,
     toastSelectBoth: '車両とドライバーの両方を選択してください',
@@ -1013,6 +1014,7 @@ const LANGS = {
     btnModalCancel: 'Hủy',
 
     toastSubmitted: 'Đã gửi yêu cầu xe',
+    toastSubmitError: 'Lưu yêu cầu thất bại. Vui lòng kiểm tra mạng và thử lại.',
     toastDateError: 'Thời gian trả xe phải sau thời gian đón',
     toastAssigned: (v, d) => `Đã xác nhận phân công (${v} / ${d})`,
     toastSelectBoth: 'Vui lòng chọn cả xe và tài xế',
@@ -1332,23 +1334,45 @@ async function submitRequest(e) {
     return;
   }
 
-  const req = {
-    id: state.nextId++,
+  const payload = {
     requester: document.getElementById('f-requester').value.trim(),
-    passengers: parseInt(document.getElementById('f-passengers').value),
+    passengers: parseInt(document.getElementById('f-passengers').value, 10),
     pickupDt,
     returnDt,
     from: document.getElementById('f-from').value.trim(),
     to: document.getElementById('f-to').value.trim(),
     notes: document.getElementById('f-notes').value.trim(),
-    status: '申請中',
-    vehicle: '',
-    driver: '',
     createdAt: new Date().toISOString(),
   };
 
-  state.requests.unshift(req);
-  await saveState();
+  try {
+    const res = await fetch('/api/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast(err.error || t('toastSubmitError'), 'error');
+      return;
+    }
+    const data = await res.json();
+    if (data.state) state = data.state;
+    else await loadState();
+    let updated = false;
+    for (const v of COMPANY_VEHICLES) {
+      if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
+    }
+    for (const d of COMPANY_DRIVERS) {
+      if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
+    }
+    if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
+    if (updated) await saveState();
+  } catch {
+    toast(t('toastSubmitError'), 'error');
+    return;
+  }
+
   document.getElementById('request-form').reset();
   updatePendingCount();
   toast(t('toastSubmitted'), 'success');
