@@ -910,6 +910,7 @@ const LANGS = {
     btnPdfExportRange: '📄 この範囲をPDF（縦）',
     toastPdfBadRange: '開始日と終了日を正しく指定してください',
     pdfTitleRange: (a, b) => `スケジュール ${a.replace(/-/g, '/')} ～ ${b.replace(/-/g, '/')}`,
+    pdfMonthsCount: 'ヶ月',
     toastPdfExporting: 'PDFを生成しています…',
     toastPdfDone: 'PDFをダウンロードしました',
     toastPdfError: 'PDFの作成に失敗しました',
@@ -1042,6 +1043,7 @@ const LANGS = {
     btnPdfExportRange: '📄 PDF khoảng này (dọc)',
     toastPdfBadRange: 'Vui lòng nhập đúng từ ngày và đến ngày',
     pdfTitleRange: (a, b) => `Lịch xe ${a.replace(/-/g, '/')} – ${b.replace(/-/g, '/')}`,
+    pdfMonthsCount: ' tháng',
     toastPdfExporting: 'Đang tạo PDF…',
     toastPdfDone: 'Đã tải PDF',
     toastPdfError: 'Không tạo được PDF',
@@ -1165,8 +1167,24 @@ function ymdKey(year, monthZero, day) {
   return `${year}-${mm}-${dd}`;
 }
 
-function yyyyMmDd(d) {
-  return ymdKey(d.getFullYear(), d.getMonth(), d.getDate());
+function uniqMonthLabelsInRange(fromIso, toIso) {
+  const parse = s => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  let a = parse(fromIso);
+  let b = parse(toIso);
+  if (a > b) [a, b] = [b, a];
+  const labels = [];
+  let prevKey = null;
+  for (let cur = new Date(a); cur <= b; cur.setDate(cur.getDate() + 1)) {
+    const key = `${cur.getFullYear()}-${cur.getMonth()}`;
+    if (key !== prevKey) {
+      prevKey = key;
+      labels.push(t('schedMonth', cur.getFullYear(), cur.getMonth() + 1));
+    }
+  }
+  return labels;
 }
 
 /** 1日分の <tr> のみ */
@@ -1382,7 +1400,12 @@ async function exportSchedulePdfFromInputs() {
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
-  const titleText = t('pdfTitleRange', fromIso, toIso);
+  const monthLabels = uniqMonthLabelsInRange(fromIso, toIso);
+  let monthHeading = monthLabels.join(' · ');
+  if (monthLabels.length > 4) {
+    monthHeading = `${monthLabels[0]} … ${monthLabels[monthLabels.length - 1]} (${monthLabels.length}${t('pdfMonthsCount')})`;
+  }
+  const dateSpanLine = t('pdfTitleRange', fromIso, toIso);
 
   const host = document.createElement('div');
   host.id = 'pdf-schedule-export-host';
@@ -1391,11 +1414,14 @@ async function exportSchedulePdfFromInputs() {
   host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1200px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
 
   host.innerHTML = `
-    <h2 style="margin:0 0 14px;font-size:18px;font-weight:700;color:#111827;">${titleText}</h2>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:18px;font-weight:700;color:#111827;line-height:1.35;">${monthHeading}</div>
+      <div style="font-size:13px;color:#374151;margin-top:6px;font-weight:600;">${dateSpanLine}</div>
+    </div>
     <div class="schedule-wrap" id="pdf-schedule-wrap">
       <table class="schedule-table">
         <thead>${theadEl.innerHTML}</thead>
-        <tbody>${buildScheduleRowsForDateRange(fromIso, toIso, todayStr, { includeMonthSep: false })}</tbody>
+        <tbody>${buildScheduleRowsForDateRange(fromIso, toIso, todayStr, { includeMonthSep: true })}</tbody>
       </table>
     </div>`;
   document.body.appendChild(host);
