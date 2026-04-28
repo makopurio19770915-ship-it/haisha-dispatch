@@ -18,6 +18,14 @@
       background: white;
       font-size: 12px;
     }
+    /* PDFキャプチャ用（画面外にも適用できるようクラス名で指定） */
+    .schedule-pdf-export .schedule-table {
+      font-size: 13px;
+      min-width: 980px;
+    }
+    .schedule-pdf-export .entry-route { font-size: 13px; }
+    .schedule-pdf-export .entry-meta { font-size: 11px; }
+    .schedule-pdf-export .entry-time { font-size: 11px; }
     .schedule-table th {
       background: var(--primary);
       color: white;
@@ -660,10 +668,21 @@
     <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 24px; margin-bottom:20px;">
       <div class="sched-month-nav" style="display:flex;flex-direction:column;align-items:stretch;gap:12px;">
         <h2 id="sched-month-title" style="margin:0;">2026年4月 車両スケジュール</h2>
-        <div class="sched-pdf-btns" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <span style="font-size:12px;color:var(--gray-500);margin-right:4px;" data-i18n="schedPdfHint">PDF出力（1か月分）</span>
-          <button type="button" class="btn btn-primary btn-sm" onclick="exportSchedulePdf(0)"><span data-i18n="btnPdfThisMonth">📄 今月をPDF</span></button>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="exportSchedulePdf(1)"><span data-i18n="btnPdfNextMonth">📄 翌月をPDF</span></button>
+        <div class="sched-pdf-btns" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:640px;">
+          <span style="font-size:12px;color:var(--gray-500);" data-i18n="schedPdfHint">日付と向きでPDF出力（複数ページのときは読みやすい大きさに分割）</span>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;"><span data-i18n="labelPdfFrom">開始</span>
+              <input type="date" id="pdf-range-start" style="padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px;font-size:13px;" />
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;"><span data-i18n="labelPdfTo">終了</span>
+              <input type="date" id="pdf-range-end" style="padding:6px 8px;border:1px solid var(--gray-300);border-radius:6px;font-size:13px;" />
+            </label>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="exportSchedulePdfFromInputs()"><span data-i18n="btnPdfExportRange">📄 この範囲をPDF（縦）</span></button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="applyPdfPresetMonth(0);exportSchedulePdfFromInputs();"><span data-i18n="btnPdfThisMonth">📄 今月を縦PDF</span></button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="applyPdfPresetMonth(1);exportSchedulePdfFromInputs();"><span data-i18n="btnPdfNextMonth">📄 翌月を縦PDF</span></button>
+          </div>
         </div>
       </div>
       <div class="schedule-legend">
@@ -883,9 +902,14 @@ const LANGS = {
     legendPending: '申請中依頼',
     legendToday: '今日',
     legendWeekend: '土日',
-    btnPdfThisMonth: '📄 今月をPDF',
-    btnPdfNextMonth: '📄 翌月をPDF',
-    schedPdfHint: 'PDF出力（1か月分）',
+    btnPdfThisMonth: '📄 今月を縦PDF',
+    btnPdfNextMonth: '📄 翌月を縦PDF',
+    schedPdfHint: '日付と向きでPDF出力（複数ページのときは読みやすい大きさに分割）',
+    labelPdfFrom: '開始',
+    labelPdfTo: '終了',
+    btnPdfExportRange: '📄 この範囲をPDF（縦）',
+    toastPdfBadRange: '開始日と終了日を正しく指定してください',
+    pdfTitleRange: (a, b) => `スケジュール ${a.replace(/-/g, '/')} ～ ${b.replace(/-/g, '/')}`,
     toastPdfExporting: 'PDFを生成しています…',
     toastPdfDone: 'PDFをダウンロードしました',
     toastPdfError: 'PDFの作成に失敗しました',
@@ -1010,9 +1034,14 @@ const LANGS = {
     legendPending: 'Yêu cầu đang chờ',
     legendToday: 'Hôm nay',
     legendWeekend: 'Cuối tuần',
-    btnPdfThisMonth: '📄 PDF tháng này',
-    btnPdfNextMonth: '📄 PDF tháng sau',
-    schedPdfHint: 'Xuất PDF (một tháng)',
+    btnPdfThisMonth: '📄 PDF tháng này (dọc)',
+    btnPdfNextMonth: '📄 PDF tháng sau (dọc)',
+    schedPdfHint: 'Chọn ngày — PDF dọc; nhiều trang nếu dài (dễ đọc hơn)',
+    labelPdfFrom: 'Từ ngày',
+    labelPdfTo: 'Đến ngày',
+    btnPdfExportRange: '📄 PDF khoảng này (dọc)',
+    toastPdfBadRange: 'Vui lòng nhập đúng từ ngày và đến ngày',
+    pdfTitleRange: (a, b) => `Lịch xe ${a.replace(/-/g, '/')} – ${b.replace(/-/g, '/')}`,
     toastPdfExporting: 'Đang tạo PDF…',
     toastPdfDone: 'Đã tải PDF',
     toastPdfError: 'Không tạo được PDF',
@@ -1130,123 +1159,222 @@ const VEH_KEYS = [
 
 const JP_DAYS = ['日','月','火','水','木','金','土'];
 
+function ymdKey(year, monthZero, day) {
+  const mm = String(monthZero + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
+}
+
+function yyyyMmDd(d) {
+  return ymdKey(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** 1日分の <tr> のみ */
+function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
+  const dateKey = ymdKey(year, month, day);
+  const d       = new Date(year, month, day);
+  const dow     = d.getDay();
+  const isToday   = dateKey === todayStr;
+  const isWeekend = dow === 0 || dow === 6;
+  const trClass   = isToday ? 'today' : (isWeekend ? 'weekend' : '');
+  const dowColor  = dow === 0 ? 'color:var(--danger)' : dow === 6 ? 'color:#2563eb' : '';
+  const wdLabel   = t('weekdays')[dow];
+
+  let html = `<tr class="${trClass}">`;
+  html += `<td class="td-date">
+      <span class="day-num">${day}</span>
+      <span class="day-label" style="${dowColor}">${wdLabel}</span>
+    </td>`;
+
+  const dayData  = EXCEL_SCHEDULE[dateKey] || {};
+  const allReqs  = getSysRequestsForDate(dateKey);
+  const unmatchedReqs = [];
+
+  for (const veh of VEH_KEYS) {
+    const excelSlots = dayData[veh.key] || [];
+    const matched = allReqs.filter(r => matchVehicleCol(r.vehicle, veh.key));
+    if (matched.length > 0) unmatchedReqs.push(...matched.map(r => r.id));
+
+    html += `<td>`;
+    let hasCells = false;
+
+    for (const s of excelSlots) {
+      const timeStr   = s.from ? (s.to ? `${s.from} – ${s.to}` : s.from) : '';
+      const metaParts = [s.requester, s.purpose].filter(Boolean).join(' / ');
+      html += `<div class="sched-entry ${veh.cls}">`;
+      if (timeStr)   html += `<div class="entry-time">⏰ ${timeStr}</div>`;
+      html += `<div class="entry-route">${s.route}</div>`;
+      if (metaParts) html += `<div class="entry-meta">${metaParts}</div>`;
+      if (s.note)    html += `<div class="entry-note">📝 ${s.note}</div>`;
+      html += `</div>`;
+      hasCells = true;
+    }
+
+    for (const r of matched) {
+      const isPending = r.status === '申請中';
+      const cls   = isPending ? 'sys-pend' : 'sys-req';
+      const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
+      const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
+      html += `<div class="sched-entry ${cls}">`;
+      html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
+      html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
+      html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
+      if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
+      html += `</div>`;
+      hasCells = true;
+    }
+
+    if (!hasCells) html += `<div class="sched-entry empty-cell">—</div>`;
+    html += `</td>`;
+  }
+
+  const unmatched = allReqs.filter(r => !unmatchedReqs.includes(r.id));
+  html += `<td>`;
+  if (unmatched.length === 0) {
+    html += `<div class="sched-entry empty-cell">—</div>`;
+  } else {
+    for (const r of unmatched) {
+      const isPending = r.status === '申請中';
+      const cls   = isPending ? 'sys-pend' : 'sys-req';
+      const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
+      const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
+      html += `<div class="sched-entry ${cls}">`;
+      html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
+      html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
+      html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
+      if (r.vehicle) html += `<div class="entry-note">🚗 ${r.vehicle}${r.driver ? ' ／ ' + r.driver : ''}</div>`;
+      html += `</div>`;
+    }
+  }
+  html += `</td>`;
+
+  html += `</tr>`;
+  return html;
+}
+
+/** 開始日〜終了日（YYYY-MM-DD、端数含む）。月をまたぐ場合は月初に区切り行 */
+function buildScheduleRowsForDateRange(startIso, endIso, todayStr, opts = {}) {
+  const includeMonthSep = opts.includeMonthSep !== false;
+  const parse = s => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  let s = parse(startIso);
+  let e = parse(endIso);
+  if (s > e) [s, e] = [e, s];
+  const endT = e.getTime();
+
+  let html = '';
+  let lastYm = null;
+  for (let cur = new Date(s); cur.getTime() <= endT; cur.setDate(cur.getDate() + 1)) {
+    const y = cur.getFullYear();
+    const mo = cur.getMonth();
+    const da = cur.getDate();
+    const ymKey = `${y}-${mo}`;
+    if (includeMonthSep && ymKey !== lastYm) {
+      lastYm = ymKey;
+      html += `<tr class="month-sep"><td colspan="6">${t('schedMonth', y, mo + 1)}</td></tr>`;
+    }
+    html += buildScheduleSingleDayRowHtml(y, mo, da, todayStr);
+  }
+  return html;
+}
+
 /** 1か月分の tbody 行 HTML（PDF では月区切り行を省略可能） */
 function buildScheduleMonthRowsHtml(year, month, todayStr, opts = {}) {
   const includeMonthSep = opts.includeMonthSep !== false;
   let html = '';
   if (includeMonthSep) {
-    const monthLabel = t('schedMonth', year, month + 1);
-    html += `<tr class="month-sep"><td colspan="6">${monthLabel}</td></tr>`;
+    html += `<tr class="month-sep"><td colspan="6">${t('schedMonth', year, month + 1)}</td></tr>`;
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   for (let day = 1; day <= daysInMonth; day++) {
-    const mm      = String(month + 1).padStart(2, '0');
-    const dd      = String(day).padStart(2, '0');
-    const dateKey = `${year}-${mm}-${dd}`;
-    const d       = new Date(year, month, day);
-    const dow     = d.getDay();
-    const isToday   = dateKey === todayStr;
-    const isWeekend = dow === 0 || dow === 6;
-    const trClass   = isToday ? 'today' : (isWeekend ? 'weekend' : '');
-    const dowColor  = dow === 0 ? 'color:var(--danger)' : dow === 6 ? 'color:#2563eb' : '';
-    const wdLabel   = t('weekdays')[dow];
-
-    html += `<tr class="${trClass}">`;
-    html += `<td class="td-date">
-      <span class="day-num">${day}</span>
-      <span class="day-label" style="${dowColor}">${wdLabel}</span>
-    </td>`;
-
-    const dayData  = EXCEL_SCHEDULE[dateKey] || {};
-    const allReqs  = getSysRequestsForDate(dateKey);
-    const unmatchedReqs = [];
-
-    for (const veh of VEH_KEYS) {
-      const excelSlots = dayData[veh.key] || [];
-      const matched = allReqs.filter(r => matchVehicleCol(r.vehicle, veh.key));
-      if (matched.length > 0) unmatchedReqs.push(...matched.map(r => r.id));
-
-      html += `<td>`;
-      let hasCells = false;
-
-      for (const s of excelSlots) {
-        const timeStr   = s.from ? (s.to ? `${s.from} – ${s.to}` : s.from) : '';
-        const metaParts = [s.requester, s.purpose].filter(Boolean).join(' / ');
-        html += `<div class="sched-entry ${veh.cls}">`;
-        if (timeStr)   html += `<div class="entry-time">⏰ ${timeStr}</div>`;
-        html += `<div class="entry-route">${s.route}</div>`;
-        if (metaParts) html += `<div class="entry-meta">${metaParts}</div>`;
-        if (s.note)    html += `<div class="entry-note">📝 ${s.note}</div>`;
-        html += `</div>`;
-        hasCells = true;
-      }
-
-      for (const r of matched) {
-        const isPending = r.status === '申請中';
-        const cls   = isPending ? 'sys-pend' : 'sys-req';
-        const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
-        const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
-        html += `<div class="sched-entry ${cls}">`;
-        html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
-        html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
-        html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
-        if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
-        html += `</div>`;
-        hasCells = true;
-      }
-
-      if (!hasCells) html += `<div class="sched-entry empty-cell">—</div>`;
-      html += `</td>`;
-    }
-
-    const unmatched = allReqs.filter(r => !unmatchedReqs.includes(r.id));
-    html += `<td>`;
-    if (unmatched.length === 0) {
-      html += `<div class="sched-entry empty-cell">—</div>`;
-    } else {
-      for (const r of unmatched) {
-        const isPending = r.status === '申請中';
-        const cls   = isPending ? 'sys-pend' : 'sys-req';
-        const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
-        const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
-        html += `<div class="sched-entry ${cls}">`;
-        html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
-        html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
-        html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
-        if (r.vehicle) html += `<div class="entry-note">🚗 ${r.vehicle}${r.driver ? ' ／ ' + r.driver : ''}</div>`;
-        html += `</div>`;
-      }
-    }
-    html += `</td>`;
-
-    html += `</tr>`;
+    html += buildScheduleSingleDayRowHtml(year, month, day, todayStr);
   }
   return html;
 }
 
-function renderSchedule() {
-  const tbody  = document.getElementById('schedule-tbody');
-  const today  = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-
-  const months = [0, 1].map(offset => {
-    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
-
-  let html = '';
-  for (const { year, month } of months) {
-    html += buildScheduleMonthRowsHtml(year, month, todayStr);
-  }
-
-  tbody.innerHTML = html;
+function applyPdfPresetMonth(offset) {
+  const now = new Date();
+  const anchor = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+  const ds = document.getElementById('pdf-range-start');
+  const de = document.getElementById('pdf-range-end');
+  if (ds) ds.value = yyyyMmDd(anchor);
+  if (de) de.value = yyyyMmDd(last);
 }
 
-async function exportSchedulePdf(monthOffset) {
+function initPdfExportDateInputs() {
+  const ds = document.getElementById('pdf-range-start');
+  const de = document.getElementById('pdf-range-end');
+  if (!ds || !de) return;
+  const now = new Date();
+  ds.value = yyyyMmDd(new Date(now.getFullYear(), now.getMonth(), 1));
+  de.value = yyyyMmDd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+}
+
+/** 縦A4に幅いっぱい、高さは複数ページに分割（文字を小さくしない） */
+function addCanvasAsPortraitPages(pdf, canvas, marginMm) {
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const contentW = pageW - 2 * marginMm;
+  const contentH = pageH - 2 * marginMm;
+  const totalHmm = (canvas.height / canvas.width) * contentW;
+  if (!isFinite(totalHmm) || totalHmm <= 0) return;
+
+  if (totalHmm <= contentH) {
+    const imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', marginMm, marginMm, contentW, totalHmm);
+    return;
+  }
+
+  const stripePx = Math.max(8, Math.ceil((canvas.width * contentH) / contentW));
+  let page = 0;
+  for (let y0 = 0; y0 < canvas.height; y0 += stripePx) {
+    const h = Math.min(stripePx, canvas.height - y0);
+    const strip = document.createElement('canvas');
+    strip.width = canvas.width;
+    strip.height = h;
+    const ctx = strip.getContext('2d');
+    ctx.drawImage(canvas, 0, y0, canvas.width, h, 0, 0, canvas.width, h);
+    const url = strip.toDataURL('image/png');
+    const drawHmm = (h / canvas.height) * totalHmm;
+    if (page++ > 0) pdf.addPage();
+    pdf.addImage(url, 'PNG', marginMm, marginMm, contentW, drawHmm);
+  }
+}
+
+async function exportSchedulePdfFromInputs() {
   const theadEl = document.querySelector('#schedule-table thead');
   if (!theadEl || typeof html2canvas === 'undefined' || !window.jspdf) {
     toast(t('toastPdfError'), 'error');
+    return;
+  }
+
+  const ds = document.getElementById('pdf-range-start');
+  const de = document.getElementById('pdf-range-end');
+  const startIso = ds?.value;
+  const endIso = de?.value;
+  if (!startIso || !endIso || startIso.length !== 10 || endIso.length !== 10) {
+    toast(t('toastPdfBadRange'), 'error');
+    return;
+  }
+
+  const parse = s => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  let sDt = parse(startIso);
+  let eDt = parse(endIso);
+  if (sDt > eDt) [sDt, eDt] = [eDt, sDt];
+  const fromIso = yyyyMmDd(sDt);
+  const toIso = yyyyMmDd(eDt);
+
+  const msPerDay = 86400000;
+  const nDays = Math.floor((eDt - sDt) / msPerDay) + 1;
+  if (nDays < 1 || nDays > 400) {
+    toast(t('toastPdfBadRange'), 'error');
     return;
   }
 
@@ -1254,22 +1382,20 @@ async function exportSchedulePdf(monthOffset) {
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
-  const target = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-  const year = target.getFullYear();
-  const month = target.getMonth();
+  const titleText = t('pdfTitleRange', fromIso, toIso);
 
   const host = document.createElement('div');
   host.id = 'pdf-schedule-export-host';
+  host.className = 'schedule-pdf-export';
   host.setAttribute('aria-hidden', 'true');
-  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1400px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1200px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
 
-  const titleText = t('schedMonth', year, month + 1);
   host.innerHTML = `
     <h2 style="margin:0 0 14px;font-size:18px;font-weight:700;color:#111827;">${titleText}</h2>
     <div class="schedule-wrap" id="pdf-schedule-wrap">
       <table class="schedule-table">
         <thead>${theadEl.innerHTML}</thead>
-        <tbody>${buildScheduleMonthRowsHtml(year, month, todayStr, { includeMonthSep: false })}</tbody>
+        <tbody>${buildScheduleRowsForDateRange(fromIso, toIso, todayStr, { includeMonthSep: false })}</tbody>
       </table>
     </div>`;
   document.body.appendChild(host);
@@ -1288,24 +1414,10 @@ async function exportSchedulePdf(monthOffset) {
     });
 
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'l', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 8;
-    const maxW = pageW - 2 * margin;
-    const maxH = pageH - 2 * margin;
-    const imgData = canvas.toDataURL('image/png');
-    let drawW = maxW;
-    let drawH = (canvas.height * drawW) / canvas.width;
-    if (drawH > maxH) {
-      drawH = maxH;
-      drawW = (canvas.width * drawH) / canvas.height;
-    }
-    const x = margin + (maxW - drawW) / 2;
-    const y = margin + (maxH - drawH) / 2;
-    pdf.addImage(imgData, 'PNG', x, y, drawW, drawH);
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    addCanvasAsPortraitPages(pdf, canvas, 10);
 
-    const fname = `schedule-${year}-${String(month + 1).padStart(2, '0')}.pdf`;
+    const fname = `schedule_${fromIso}_${toIso}.pdf`;
     pdf.save(fname);
     toast(t('toastPdfDone'), 'success');
   } catch (e) {
@@ -1314,6 +1426,24 @@ async function exportSchedulePdf(monthOffset) {
   } finally {
     host.remove();
   }
+}
+
+function renderSchedule() {
+  const tbody  = document.getElementById('schedule-tbody');
+  const today  = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const months = [0, 1].map(offset => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  let html = '';
+  for (const { year, month } of months) {
+    html += buildScheduleMonthRowsHtml(year, month, todayStr);
+  }
+
+  tbody.innerHTML = html;
 }
 
 function getSysRequestsForDate(dateStr) {
@@ -2024,6 +2154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadState();
   updatePendingCount();
   applyLang();
+  initPdfExportDateInputs();
   renderQuickPlaces();
 
   document.getElementById('vehicle-name').addEventListener('keydown', e => {
