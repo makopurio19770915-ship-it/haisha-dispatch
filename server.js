@@ -11,6 +11,59 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1 };
 
+const DISCORD_WEBHOOK_URL = (process.env.DISCORD_WEBHOOK_URL || '').trim();
+
+function clipText(s, max) {
+  const t = String(s ?? '');
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t || '—';
+}
+
+/** 新規配車依頼を Discord へ（環境変数 DISCORD_WEBHOOK_URL が無ければ何もしない） */
+async function notifyDiscordNewRequest(req) {
+  if (!DISCORD_WEBHOOK_URL || !req) return;
+
+  let pickup = '—';
+  let ret = '—';
+  try {
+    if (req.pickupDt) pickup = new Date(req.pickupDt).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' });
+  } catch { /* ignore */ }
+  try {
+    if (req.returnDt) ret = new Date(req.returnDt).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' });
+  } catch { /* ignore */ }
+
+  const embed = {
+    title: `🚗 新規配車依頼 #${req.id}`,
+    color: 0x1e40af,
+    fields: [
+      { name: '申請者', value: clipText(req.requester, 200), inline: true },
+      { name: '人数', value: String(req.passengers ?? '—'), inline: true },
+      { name: 'ステータス', value: clipText(req.status, 80), inline: true },
+      { name: '乗車',
+        value: clipText(pickup, 200), inline: false },
+      { name: '返車予定', value: clipText(ret, 200), inline: false },
+      { name: '出発地', value: clipText(req.from, 1000), inline: true },
+      { name: '目的地', value: clipText(req.to, 1000), inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+  };
+  if (req.notes && String(req.notes).trim()) {
+    embed.fields.push({ name: '備考', value: clipText(req.notes, 1000), inline: false });
+  }
+
+  const r = await fetch(DISCORD_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: '配車管理',
+      embeds: [embed],
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`HTTP ${r.status} ${txt.slice(0, 300)}`);
+  }
+}
+
 /** 同時POSTで read→write が混ざらないよう直列化（依頼の取りこぼし防止） */
 let mutationQueue = Promise.resolve();
 function enqueueMutation(fn) {
@@ -100,6 +153,7 @@ app.post('/api/state', async (req, res) => {
 app.post('/api/requests', async (req, res) => {
   try {
     const b = req.body || {};
+    let created = null;
     await enqueueMutation(async () => {
       const s = await readState();
       const id = s.nextId++;
@@ -117,10 +171,16 @@ app.post('/api/requests', async (req, res) => {
         driver: '',
         createdAt: b.createdAt || new Date().toISOString(),
       };
+      created = newReq;
       s.requests.unshift(newReq);
       await writeState(s);
     });
     const data = await readState();
+    if (created && DISCORD_WEBHOOK_URL) {
+      void notifyDiscordNewRequest(created).catch((err) =>
+        console.warn('[Discord webhook]', err.message || err)
+      );
+    }
     res.json({ ok: true, state: data });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -158,6 +218,9 @@ async function start() {
     }
     if (process.env.RENDER_EXTERNAL_URL) {
       console.log(`  クラウド: ${process.env.RENDER_EXTERNAL_URL}`);
+    }
+    if (DISCORD_WEBHOOK_URL) {
+      console.log('  Discord: 新規依頼時に Webhook 通知を送ります');
     }
     console.log('========================================\n');
   });
