@@ -9,7 +9,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'db.json');
 const MONGODB_URI = process.env.MONGODB_URI;
 
-const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1 };
+const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1, scheduleExcelMemos: {} };
 
 const DISCORD_WEBHOOK_URL = (process.env.DISCORD_WEBHOOK_URL || '').trim();
 
@@ -170,6 +170,7 @@ app.post('/api/requests', async (req, res) => {
         vehicle: '',
         driver: '',
         createdAt: b.createdAt || new Date().toISOString(),
+        scheduleMemo: '',
       };
       created = newReq;
       s.requests.unshift(newReq);

@@ -84,6 +84,39 @@
     .sched-entry.sys-req  { background: #f0fdf4; border-left: 3px solid #16a34a; }
     .sched-entry.sys-pend { background: #fffbeb; border-left: 3px solid #f59e0b; }
 
+    .sched-memo-wrap {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--gray-300);
+    }
+    .sched-memo-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--gray-500);
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .sched-memo-input {
+      width: 100%;
+      min-height: 44px;
+      padding: 5px 7px;
+      font-size: 11px;
+      font-family: inherit;
+      line-height: 1.4;
+      border: 1px solid var(--gray-300);
+      border-radius: 4px;
+      resize: vertical;
+      box-sizing: border-box;
+      background: #fff;
+    }
+    .sched-memo-input:focus {
+      outline: none;
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 2px var(--primary-bg);
+    }
+
     .entry-time { font-size: 11px; font-weight: 700; color: var(--gray-500); margin-bottom: 2px; }
     .entry-route { font-size: 12px; font-weight: 600; color: var(--gray-900); }
     .entry-meta { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
@@ -918,6 +951,8 @@ const LANGS = {
     badgePending: '🕐 申請中',
     badgeConfirmed: '✔ 確定',
     badgeDone: '✅ 完了',
+    schedMemoLabel: 'スケジュール備考',
+    schedMemoPh: '追記（全員共有・保存されます）',
 
     // Assign modal
     assignTitle: '車両・ドライバーを割り当てる',
@@ -1051,6 +1086,8 @@ const LANGS = {
     badgePending: '🕐 Đang chờ',
     badgeConfirmed: '✔ Xác nhận',
     badgeDone: '✅ Hoàn thành',
+    schedMemoLabel: 'Ghi chú lịch',
+    schedMemoPh: 'Thêm ghi chú (lưu chung)',
 
     assignTitle: 'Phân công xe và tài xế',
     assignVehicle: 'Chọn xe',
@@ -1191,6 +1228,92 @@ function uniqMonthLabelsInRange(fromIso, toIso) {
   return labels;
 }
 
+function escapeHtmlText(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeHtmlAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function excelMemoKey(dateKey, vehKey, slotIndex) {
+  return `${dateKey}|${slotIndex}|${vehKey}`;
+}
+
+function getExcelScheduleMemo(dateKey, vehKey, slotIndex) {
+  if (!state.scheduleExcelMemos) return '';
+  const v = state.scheduleExcelMemos[excelMemoKey(dateKey, vehKey, slotIndex)];
+  return v == null ? '' : String(v);
+}
+
+function schedMemoTextareaBlockForRequest(reqId, value) {
+  const ph = escapeHtmlAttr(t('schedMemoPh'));
+  const esc = escapeHtmlText(value || '');
+  return `<div class="sched-memo-wrap">
+      <span class="sched-memo-label">${escapeHtmlText(t('schedMemoLabel'))}</span>
+      <textarea class="sched-memo-input" rows="2" maxlength="800" data-kind="req" data-req-id="${reqId}" onblur="onScheduleMemoInputBlur(this)" placeholder="${ph}">${esc}</textarea>
+    </div>`;
+}
+
+function schedMemoTextareaBlockForExcel(dateKey, vehKey, slotIndex, value) {
+  const ph = escapeHtmlAttr(t('schedMemoPh'));
+  const esc = escapeHtmlText(value || '');
+  return `<div class="sched-memo-wrap">
+      <span class="sched-memo-label">${escapeHtmlText(t('schedMemoLabel'))}</span>
+      <textarea class="sched-memo-input" rows="2" maxlength="800" data-kind="excel"
+        data-date-key="${escapeHtmlAttr(dateKey)}"
+        data-veh-key="${escapeHtmlAttr(vehKey)}"
+        data-slot-index="${slotIndex}"
+        onblur="onScheduleMemoInputBlur(this)" placeholder="${ph}">${esc}</textarea>
+    </div>`;
+}
+
+async function onScheduleMemoInputBlur(el) {
+  const kind = el.dataset.kind;
+  const text = el.value;
+  if (kind === 'req') {
+    const id = parseInt(el.dataset.reqId, 10);
+    if (!id) return;
+    const req = state.requests.find(r => r.id === id);
+    if (!req) return;
+    const next = String(text ?? '').trim();
+    if ((req.scheduleMemo || '') === next) return;
+    req.scheduleMemo = next;
+    try {
+      await saveState();
+    } catch (e) {
+      console.error(e);
+      toast(t('toastSubmitError'), 'error');
+    }
+    return;
+  }
+  if (kind === 'excel') {
+    const dk = el.dataset.dateKey;
+    const vk = el.dataset.vehKey;
+    const si = parseInt(el.dataset.slotIndex, 10);
+    if (!dk || !vk || Number.isNaN(si)) return;
+    if (!state.scheduleExcelMemos) state.scheduleExcelMemos = {};
+    const k = excelMemoKey(dk, vk, si);
+    const next = String(text ?? '').trim();
+    const prev = state.scheduleExcelMemos[k] || '';
+    if (prev === next) return;
+    if (next === '') delete state.scheduleExcelMemos[k];
+    else state.scheduleExcelMemos[k] = next;
+    try {
+      await saveState();
+    } catch (e) {
+      console.error(e);
+      toast(t('toastSubmitError'), 'error');
+    }
+  }
+}
+
 /** 1日分の <tr> のみ */
 function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
   const dateKey = ymdKey(year, month, day);
@@ -1220,7 +1343,8 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
     html += `<td>`;
     let hasCells = false;
 
-    for (const s of excelSlots) {
+    for (let si = 0; si < excelSlots.length; si++) {
+      const s = excelSlots[si];
       const timeStr   = s.from ? (s.to ? `${s.from} – ${s.to}` : s.from) : '';
       const metaParts = [s.requester, s.purpose].filter(Boolean).join(' / ');
       html += `<div class="sched-entry ${veh.cls}">`;
@@ -1228,6 +1352,7 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
       html += `<div class="entry-route">${s.route}</div>`;
       if (metaParts) html += `<div class="entry-meta">${metaParts}</div>`;
       if (s.note)    html += `<div class="entry-note">📝 ${s.note}</div>`;
+      html += schedMemoTextareaBlockForExcel(dateKey, veh.key, si, getExcelScheduleMemo(dateKey, veh.key, si));
       html += `</div>`;
       hasCells = true;
     }
@@ -1242,6 +1367,8 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
       html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
       html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
       if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
+      if (r.notes && String(r.notes).trim()) html += `<div class="entry-note">📋 ${r.notes}</div>`;
+      html += schedMemoTextareaBlockForRequest(r.id, r.scheduleMemo || '');
       html += `</div>`;
       hasCells = true;
     }
@@ -1265,6 +1392,9 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
       html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
       html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
       if (r.vehicle) html += `<div class="entry-note">🚗 ${r.vehicle}${r.driver ? ' ／ ' + r.driver : ''}</div>`;
+      else if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
+      if (r.notes && String(r.notes).trim()) html += `<div class="entry-note">📋 ${r.notes}</div>`;
+      html += schedMemoTextareaBlockForRequest(r.id, r.scheduleMemo || '');
       html += `</div>`;
     }
   }
@@ -1506,6 +1636,7 @@ let state = {
   drivers: [],
   places: [],
   nextId: 1,
+  scheduleExcelMemos: {},
 };
 
 let assignTargetId = null;
@@ -1553,6 +1684,10 @@ async function loadState() {
         if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
       }
       if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
+      if (!state.scheduleExcelMemos || typeof state.scheduleExcelMemos !== 'object') {
+        state.scheduleExcelMemos = {};
+        updated = true;
+      }
       if (updated) await saveState();
     } else {
       state.vehicles = [...COMPANY_VEHICLES];
