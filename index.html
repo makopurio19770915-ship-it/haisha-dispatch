@@ -627,8 +627,26 @@
             <textarea id="f-notes" data-i18n-ph="phNotes" placeholder="特記事項があれば入力してください"></textarea>
           </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-form" data-i18n="btnSubmit">依頼を申請する</button>
+        <button type="submit" id="btn-submit" class="btn btn-primary btn-form" data-i18n="btnSubmit">依頼を申請する</button>
       </form>
+    </div>
+
+    <!-- ========== 送信確認カード ========== -->
+    <div id="submit-confirm" style="display:none;">
+      <div class="card" style="border:2px solid #16a34a; background:#f0fdf4;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="font-size:28px;">✅</span>
+          <div>
+            <div style="font-size:17px;font-weight:700;color:#15803d;" data-i18n="confirmTitle">申請が完了しました</div>
+            <div style="font-size:13px;color:#4b5563;" data-i18n="confirmSub">担当者が確認・割り当てを行います。しばらくお待ちください。</div>
+          </div>
+        </div>
+        <div id="confirm-detail" style="background:white;border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.9;border:1px solid #bbf7d0;">
+        </div>
+        <button onclick="startNewRequest()" class="btn btn-primary btn-form" style="margin-top:16px;" data-i18n="btnNewRequest">
+          ＋ 新しい依頼を申請する
+        </button>
+      </div>
     </div>
   </div>
 
@@ -969,8 +987,17 @@ const LANGS = {
     btnModalCancel: 'キャンセル',
 
     // Toasts / alerts
-    toastSubmitted: '配車依頼を申請しました',
     toastSubmitError: '申請の保存に失敗しました。ネットワークを確認して再度お試しください。',
+    btnSubmitting: '送信中...',
+    confirmTitle: '申請が完了しました',
+    confirmSub: '担当者が確認・割り当てを行います。しばらくお待ちください。',
+    btnNewRequest: '＋ 新しい依頼を申請する',
+    confirmId: id => `申請番号：#${id}`,
+    confirmPickup: '乗車日時',
+    confirmFrom: '出発地',
+    confirmTo: '目的地',
+    confirmPassengers: '人数',
+    confirmNotes: '備考',
     toastDateError: '返車予定日時は乗車日時より後にしてください',
     toastAssigned: (v, d) => `割り当てを確定しました（${v} ／ ${d}）`,
     toastSelectBoth: '車両とドライバーの両方を選択してください',
@@ -1101,6 +1128,16 @@ const LANGS = {
 
     btnModalCancel: 'Hủy',
 
+    btnSubmitting: 'Đang gửi...',
+    confirmTitle: 'Đã gửi yêu cầu thành công',
+    confirmSub: 'Người quản lý sẽ xem xét và phân công xe. Vui lòng chờ.',
+    btnNewRequest: '＋ Gửi yêu cầu mới',
+    confirmId: id => `Mã yêu cầu: #${id}`,
+    confirmPickup: 'Thời gian đón',
+    confirmFrom: 'Điểm xuất phát',
+    confirmTo: 'Điểm đến',
+    confirmPassengers: 'Số người',
+    confirmNotes: 'Ghi chú',
     toastSubmitted: 'Đã gửi yêu cầu xe',
     toastSubmitError: 'Lưu yêu cầu thất bại. Vui lòng kiểm tra mạng và thử lại.',
     toastDateError: 'Thời gian trả xe phải sau thời gian đón',
@@ -1735,6 +1772,11 @@ async function submitRequest(e) {
     createdAt: new Date().toISOString(),
   };
 
+  const submitBtn = document.getElementById('btn-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = t('btnSubmitting');
+
+  let createdReq = null;
   try {
     const res = await fetch('/api/requests', {
       method: 'POST',
@@ -1744,11 +1786,14 @@ async function submitRequest(e) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       toast(err.error || t('toastSubmitError'), 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = t('btnSubmit');
       return;
     }
     const data = await res.json();
     if (data.state) state = data.state;
     else await loadState();
+    createdReq = state.requests.find(r => r.createdAt === payload.createdAt && r.requester === payload.requester) || state.requests[0];
     let updated = false;
     for (const v of COMPANY_VEHICLES) {
       if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
@@ -1760,12 +1805,44 @@ async function submitRequest(e) {
     if (updated) await saveState();
   } catch {
     toast(t('toastSubmitError'), 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = t('btnSubmit');
     return;
   }
 
   document.getElementById('request-form').reset();
   updatePendingCount();
-  toast(t('toastSubmitted'), 'success');
+
+  // 確認カードを表示してフォームを隠す
+  document.getElementById('request-form').closest('.card').style.display = 'none';
+  const confirmDiv = document.getElementById('submit-confirm');
+  confirmDiv.style.display = 'block';
+
+  if (createdReq) {
+    const pickupLabel = formatDt(createdReq.pickupDt);
+    const rows = [
+      `<div style="font-size:16px;font-weight:700;color:#15803d;margin-bottom:8px;">${t('confirmId')(createdReq.id)}</div>`,
+      `<div><span style="color:#6b7280;">${t('confirmPickup')}：</span><strong>${pickupLabel}</strong></div>`,
+      `<div><span style="color:#6b7280;">${t('confirmFrom')}：</span><strong>${createdReq.from}</strong></div>`,
+      `<div><span style="color:#6b7280;">${t('confirmTo')}：</span><strong>${createdReq.to}</strong></div>`,
+      `<div><span style="color:#6b7280;">${t('confirmPassengers')}：</span><strong>${createdReq.passengers} ${t('reqSans')}</strong></div>`,
+    ];
+    if (createdReq.notes) {
+      rows.push(`<div><span style="color:#6b7280;">${t('confirmNotes')}：</span>${createdReq.notes}</div>`);
+    }
+    document.getElementById('confirm-detail').innerHTML = rows.join('');
+  }
+
+  applyLang();
+}
+
+function startNewRequest() {
+  document.getElementById('submit-confirm').style.display = 'none';
+  const formCard = document.getElementById('request-form').closest('.card');
+  formCard.style.display = '';
+  const submitBtn = document.getElementById('btn-submit');
+  submitBtn.disabled = false;
+  submitBtn.textContent = t('btnSubmit');
 }
 
 // ==================== Request List ====================
