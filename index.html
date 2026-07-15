@@ -720,7 +720,7 @@
   <div class="tab-panel" id="panel-schedule">
     <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 24px; margin-bottom:20px;">
       <div class="sched-month-nav" style="display:flex;flex-direction:column;align-items:stretch;gap:12px;">
-        <h2 id="sched-month-title" style="margin:0;">2026年4月 車両スケジュール</h2>
+        <h2 id="sched-month-title" style="margin:0;"></h2>
         <div class="sched-pdf-btns" style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:640px;">
           <span style="font-size:12px;color:var(--gray-500);" data-i18n="schedPdfHint">日付と向きでPDF出力（複数ページのときは読みやすい大きさに分割）</span>
           <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
@@ -951,6 +951,7 @@ const LANGS = {
     // Schedule
     schedTitle: year => `${year}年`,
     schedMonth: (y, m) => `${y}年${m}月`,
+    schedPanelTitle: label => `${label} 車両スケジュール`,
     schedColDate: '日付',
     schedColSys: '📋 システム申請',
     legendConfirmed: '確定済み依頼',
@@ -1095,6 +1096,7 @@ const LANGS = {
 
     schedTitle: year => `Năm ${year}`,
     schedMonth: (y, m) => `Tháng ${m}/${y}`,
+    schedPanelTitle: label => `Lịch xe ${label}`,
     schedColDate: 'Ngày',
     schedColSys: '📋 Yêu cầu hệ thống',
     legendConfirmed: 'Yêu cầu đã xác nhận',
@@ -1215,6 +1217,7 @@ function applyLang() {
   if (schedDateTh) schedDateTh.textContent = L.schedColDate;
   const schedSysTh = document.getElementById('th-sys');
   if (schedSysTh) schedSysTh.innerHTML = L.schedColSys;
+  updateScheduleTitle();
 
   // 再描画が必要な動的コンテンツ
   const activePanel = document.querySelector('.tab-panel.active');
@@ -1630,15 +1633,48 @@ async function exportSchedulePdfFromInputs() {
   }
 }
 
+function getScheduleDisplayMonths() {
+  const today = new Date();
+  return [0, 1].map(offset => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+}
+
+/** 画面上部の「○年○月 車両スケジュール」を今月・翌月に合わせて更新 */
+function updateScheduleTitle() {
+  const el = document.getElementById('sched-month-title');
+  if (!el) return;
+
+  const months = getScheduleDisplayMonths();
+  let label;
+  if (months.length === 1) {
+    const { year, month } = months[0];
+    label = t('schedMonth', year, month + 1);
+  } else if (months.length >= 2) {
+    const [a, b] = months;
+    if (a.year === b.year) {
+      label = currentLang === 'ja'
+        ? `${a.year}年${a.month + 1}月・${b.month + 1}月`
+        : `${t('schedMonth', a.year, a.month + 1)} · ${t('schedMonth', b.year, b.month + 1)}`;
+    } else {
+      label = currentLang === 'ja'
+        ? `${a.year}年${a.month + 1}月・${b.year}年${b.month + 1}月`
+        : `${t('schedMonth', a.year, a.month + 1)} · ${t('schedMonth', b.year, b.month + 1)}`;
+    }
+  } else {
+    const now = new Date();
+    label = t('schedMonth', now.getFullYear(), now.getMonth() + 1);
+  }
+  el.textContent = t('schedPanelTitle', label);
+}
+
 function renderSchedule() {
   const tbody  = document.getElementById('schedule-tbody');
   const today  = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
-  const months = [0, 1].map(offset => {
-    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-    return { year: d.getFullYear(), month: d.getMonth() };
-  });
+  const months = getScheduleDisplayMonths();
 
   let html = '';
   for (const { year, month } of months) {
@@ -1646,6 +1682,7 @@ function renderSchedule() {
   }
 
   tbody.innerHTML = html;
+  updateScheduleTitle();
 }
 
 function getSysRequestsForDate(dateStr) {
