@@ -14,14 +14,14 @@
     .schedule-table {
       border-collapse: collapse;
       width: 100%;
-      min-width: 900px;
+      min-width: 1080px;
       background: white;
       font-size: 12px;
     }
     /* PDFキャプチャ用（画面外にも適用できるようクラス名で指定） */
     .schedule-pdf-export .schedule-table {
       font-size: 13px;
-      min-width: 980px;
+      min-width: 1160px;
     }
     .schedule-pdf-export .entry-route { font-size: 13px; }
     .schedule-pdf-export .entry-meta { font-size: 11px; }
@@ -43,6 +43,7 @@
     .schedule-table th.col-bus   { background: #0f766e; }
     .schedule-table th.col-small { background: #92400e; }
     .schedule-table th.col-big   { background: #6b21a8; }
+    .schedule-table th.col-limo  { background: #4d7c0f; }
     .schedule-table th.col-sys   { background: #166534; }
     .schedule-table tr.month-sep td { background: var(--primary) !important; color: white; font-weight: 700; font-size: 13px; padding: 8px 14px; }
 
@@ -80,6 +81,7 @@
     .sched-entry.bus   { background: #f0fdfa; border-left: 3px solid #14b8a6; }
     .sched-entry.small { background: #fffbeb; border-left: 3px solid #f59e0b; }
     .sched-entry.big   { background: #faf5ff; border-left: 3px solid #a855f7; }
+    .sched-entry.limo  { background: #f7fee7; border-left: 3px solid #84cc16; }
     .sched-entry.empty-cell { color: var(--gray-300); font-size: 11px; text-align: center; padding: 4px; }
     .sched-entry.sys-req  { background: #f0fdf4; border-left: 3px solid #16a34a; }
     .sched-entry.sys-pend { background: #fffbeb; border-left: 3px solid #f59e0b; }
@@ -741,6 +743,7 @@
         <div class="legend-item"><div class="legend-dot" style="background:#14b8a6;"></div>BUS 61LD.02599</div>
         <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div>SMALL TRUCK 61LD.01001</div>
         <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div>BIG TRUCK 61LD.04922</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#84cc16;"></div>LIMO GREEN</div>
         <div class="legend-item"><div class="legend-dot" style="background:#16a34a;"></div><span data-i18n="legendConfirmed">確定済み依頼</span></div>
         <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border:1px solid #d97706;"></div><span data-i18n="legendPending">申請中依頼</span></div>
         <div class="legend-item" style="margin-left:auto;">
@@ -756,6 +759,7 @@
               <th class="col-bus">🚌 BUS<br>61LD.02599</th>
               <th class="col-small">🚚 SMALL TRUCK<br>61LD.01001</th>
               <th class="col-big">🚛 BIG TRUCK<br>61LD.04922</th>
+              <th class="col-limo">🚘 LIMO GREEN</th>
               <th class="col-sys" id="th-sys">📋 システム申請</th>
             </tr>
           </thead>
@@ -1231,6 +1235,7 @@ const VEH_KEYS = [
   { key: 'BUS 61LD.02599',             cls: 'bus'   },
   { key: 'SMALL TRUCK 1.1T 61LD.01001',cls: 'small' },
   { key: 'BIG TRUCK 5T 61LD.04922',    cls: 'big'   },
+  { key: 'LIMO GREEN',                 cls: 'limo'  },
 ];
 
 const JP_DAYS = ['日','月','火','水','木','金','土'];
@@ -1462,7 +1467,7 @@ function buildScheduleRowsForDateRange(startIso, endIso, todayStr, opts = {}) {
     const ymKey = `${y}-${mo}`;
     if (includeMonthSep && ymKey !== lastYm) {
       lastYm = ymKey;
-      html += `<tr class="month-sep"><td colspan="6">${t('schedMonth', y, mo + 1)}</td></tr>`;
+      html += `<tr class="month-sep"><td colspan="${VEH_KEYS.length + 2}">${t('schedMonth', y, mo + 1)}</td></tr>`;
     }
     html += buildScheduleSingleDayRowHtml(y, mo, da, todayStr);
   }
@@ -1474,7 +1479,7 @@ function buildScheduleMonthRowsHtml(year, month, todayStr, opts = {}) {
   const includeMonthSep = opts.includeMonthSep !== false;
   let html = '';
   if (includeMonthSep) {
-    html += `<tr class="month-sep"><td colspan="6">${t('schedMonth', year, month + 1)}</td></tr>`;
+    html += `<tr class="month-sep"><td colspan="${VEH_KEYS.length + 2}">${t('schedMonth', year, month + 1)}</td></tr>`;
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1582,7 +1587,7 @@ async function exportSchedulePdfFromInputs() {
   host.id = 'pdf-schedule-export-host';
   host.className = 'schedule-pdf-export';
   host.setAttribute('aria-hidden', 'true');
-  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1200px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1380px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
 
   host.innerHTML = `
     <div style="margin-bottom:14px;">
@@ -1661,6 +1666,7 @@ function matchVehicleCol(vehicleName, colKey) {
     'BUS 61LD.02599':              ['02599', 'BUS'],
     'SMALL TRUCK 1.1T 61LD.01001': ['01001', 'SMALL'],
     'BIG TRUCK 5T 61LD.04922':     ['04922', 'BIG TRUCK'],
+    'LIMO GREEN':                  ['LIMO GREEN', 'LIMO'],
   };
   const keywords = patterns[colKey] || [];
   return keywords.some(kw => v.includes(kw));
@@ -1704,6 +1710,7 @@ const COMPANY_VEHICLES = [
   'BUS 61LD.02599',
   'SMALL TRUCK 1.1T 61LD.01001',
   'BIG TRUCK 5T 61LD.04922',
+  'LIMO GREEN',
 ];
 const COMPANY_DRIVERS = ['Mr Sinh', 'Mr Duong', 'HORIE'];
 

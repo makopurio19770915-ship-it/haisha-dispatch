@@ -13,6 +13,56 @@ const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nex
 
 const DISCORD_WEBHOOK_URL = (process.env.DISCORD_WEBHOOK_URL || '').trim();
 
+/**
+ * 状態データを安全な形に整える（ID重複・nextId逆行を防ぐ）
+ */
+function normalizeState(input) {
+  const merged = { ...INITIAL_STATE, ...(input || {}) };
+
+  merged.requests = Array.isArray(merged.requests) ? merged.requests : [];
+  merged.vehicles = Array.isArray(merged.vehicles) ? merged.vehicles : [];
+  merged.drivers = Array.isArray(merged.drivers) ? merged.drivers : [];
+  merged.places = Array.isArray(merged.places) ? merged.places : [];
+  merged.scheduleExcelMemos =
+    merged.scheduleExcelMemos && typeof merged.scheduleExcelMemos === 'object'
+      ? merged.scheduleExcelMemos
+      : {};
+
+  const usedIds = new Set();
+  let maxId = 0;
+  let nextId = Number.parseInt(merged.nextId, 10);
+  if (!Number.isFinite(nextId) || nextId < 1) nextId = 1;
+
+  merged.requests = merged.requests.map((req) => {
+    const normalizedReq = { ...(req || {}) };
+    const parsedId = Number.parseInt(normalizedReq.id, 10);
+    if (Number.isFinite(parsedId) && parsedId >= 1 && !usedIds.has(parsedId)) {
+      normalizedReq.id = parsedId;
+      usedIds.add(parsedId);
+      if (parsedId > maxId) maxId = parsedId;
+      return normalizedReq;
+    }
+
+    // 重複/不正IDは後段で採番し直す
+    normalizedReq.id = null;
+    return normalizedReq;
+  });
+
+  nextId = Math.max(nextId, maxId + 1);
+  merged.requests = merged.requests.map((req) => {
+    if (Number.isFinite(req.id) && req.id >= 1) return req;
+    while (usedIds.has(nextId)) nextId += 1;
+    req.id = nextId;
+    usedIds.add(nextId);
+    maxId = Math.max(maxId, nextId);
+    nextId += 1;
+    return req;
+  });
+
+  merged.nextId = Math.max(nextId, maxId + 1);
+  return merged;
+}
+
 function clipText(s, max) {
   const t = String(s ?? '');
   return t.length > max ? `${t.slice(0, max - 1)}…` : t || '—';
@@ -108,22 +158,23 @@ async function readState() {
   if (useMongo) {
     const col = mongoDb.collection('state');
     const doc = await col.findOne({ _id: 'main' });
-    return doc?.data ? { ...INITIAL_STATE, ...doc.data } : INITIAL_STATE;
+    return normalizeState(doc?.data || INITIAL_STATE);
   }
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return normalizeState(JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')));
   } catch {
-    return INITIAL_STATE;
+    return normalizeState(INITIAL_STATE);
   }
 }
 
 async function writeState(body) {
+  const normalized = normalizeState(body);
   if (useMongo) {
     const col = mongoDb.collection('state');
-    await col.updateOne({ _id: 'main' }, { $set: { data: body, updatedAt: new Date() } }, { upsert: true });
+    await col.updateOne({ _id: 'main' }, { $set: { data: normalized, updatedAt: new Date() } }, { upsert: true });
     return;
   }
-  fs.writeFileSync(DATA_FILE, JSON.stringify(body, null, 2));
+  fs.writeFileSync(DATA_FILE, JSON.stringify(normalized, null, 2));
 }
 
 app.use(express.json({ limit: '10mb' }));
@@ -156,7 +207,12 @@ app.post('/api/requests', async (req, res) => {
     let created = null;
     await enqueueMutation(async () => {
       const s = await readState();
-      const id = s.nextId++;
+      const maxExistingId = s.requests.reduce((max, r) => {
+        const n = Number.parseInt(r?.id, 10);
+        return Number.isFinite(n) && n > max ? n : max;
+      }, 0);
+      const id = Math.max(Number.parseInt(s.nextId, 10) || 1, maxExistingId + 1);
+      s.nextId = id + 1;
       const newReq = {
         id,
         requester: String(b.requester || '').trim(),
