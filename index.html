@@ -743,7 +743,7 @@
         <div class="legend-item"><div class="legend-dot" style="background:#14b8a6;"></div>BUS 61LD.02599</div>
         <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div>SMALL TRUCK 61LD.01001</div>
         <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div>BIG TRUCK 61LD.04922</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#84cc16;"></div>LIMO GREEN</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#84cc16;"></div>LIMO GREEN 51B-970.37</div>
         <div class="legend-item"><div class="legend-dot" style="background:#16a34a;"></div><span data-i18n="legendConfirmed">確定済み依頼</span></div>
         <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border:1px solid #d97706;"></div><span data-i18n="legendPending">申請中依頼</span></div>
         <div class="legend-item" style="margin-left:auto;">
@@ -759,7 +759,7 @@
               <th class="col-bus">🚌 BUS<br>61LD.02599</th>
               <th class="col-small">🚚 SMALL TRUCK<br>61LD.01001</th>
               <th class="col-big">🚛 BIG TRUCK<br>61LD.04922</th>
-              <th class="col-limo">🚘 LIMO GREEN</th>
+              <th class="col-limo">🚘 LIMO GREEN<br>51B-970.37</th>
               <th class="col-sys" id="th-sys">📋 システム申請</th>
             </tr>
           </thead>
@@ -1238,7 +1238,7 @@ const VEH_KEYS = [
   { key: 'BUS 61LD.02599',             cls: 'bus'   },
   { key: 'SMALL TRUCK 1.1T 61LD.01001',cls: 'small' },
   { key: 'BIG TRUCK 5T 61LD.04922',    cls: 'big'   },
-  { key: 'LIMO GREEN',                 cls: 'limo'  },
+  { key: 'LIMO GREEN 51B-970.37',      cls: 'limo'  },
 ];
 
 const JP_DAYS = ['日','月','火','水','木','金','土'];
@@ -1703,7 +1703,7 @@ function matchVehicleCol(vehicleName, colKey) {
     'BUS 61LD.02599':              ['02599', 'BUS'],
     'SMALL TRUCK 1.1T 61LD.01001': ['01001', 'SMALL'],
     'BIG TRUCK 5T 61LD.04922':     ['04922', 'BIG TRUCK'],
-    'LIMO GREEN':                  ['LIMO GREEN', 'LIMO'],
+    'LIMO GREEN 51B-970.37':       ['LIMO GREEN', 'LIMO', '51B', '970.37', '97037'],
   };
   const keywords = patterns[colKey] || [];
   return keywords.some(kw => v.includes(kw));
@@ -1742,12 +1742,14 @@ async function saveState() {
   }
 }
 
+const LIMO_VEHICLE = 'LIMO GREEN 51B-970.37';
+
 const COMPANY_VEHICLES = [
   'CROSS 61LD.08418',
   'BUS 61LD.02599',
   'SMALL TRUCK 1.1T 61LD.01001',
   'BIG TRUCK 5T 61LD.04922',
-  'LIMO GREEN',
+  LIMO_VEHICLE,
 ];
 const COMPANY_DRIVERS = ['Mr Sinh', 'Mr Duong', 'HORIE'];
 
@@ -1768,6 +1770,17 @@ async function loadState() {
       if (!state.scheduleExcelMemos || typeof state.scheduleExcelMemos !== 'object') {
         state.scheduleExcelMemos = {};
         updated = true;
+      }
+      if (state.vehicles.includes('LIMO GREEN')) {
+        state.vehicles = state.vehicles.filter(v => v !== 'LIMO GREEN');
+        if (!state.vehicles.includes(LIMO_VEHICLE)) state.vehicles.unshift(LIMO_VEHICLE);
+        updated = true;
+      }
+      for (const req of state.requests) {
+        if (req.vehicle === 'LIMO GREEN') {
+          req.vehicle = LIMO_VEHICLE;
+          updated = true;
+        }
       }
       if (updated) await saveState();
     } else {

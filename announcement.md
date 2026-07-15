@@ -38,7 +38,7 @@
 | 🚌 BUS | 61LD.02599 |
 | 🚚 SMALL TRUCK 1.1T | 61LD.01001 |
 | 🚛 BIG TRUCK 5T | 61LD.04922 |
-| 🚘 LIMO GREEN | — |
+| 🚘 LIMO GREEN | 51B-970.37 |
 
 ---
 
