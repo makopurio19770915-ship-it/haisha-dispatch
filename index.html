@@ -1732,13 +1732,23 @@ function isoToDatetimeLocal(iso) {
 
 // ==================== Storage ====================
 async function saveState() {
-  await fetch('/api/state', {
+  const res = await fetch('/api/state', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(state),
   });
+  if (res.ok) {
+    const data = await res.json().catch(() => null);
+    if (data && data.state && Array.isArray(data.state.requests)) {
+      state = data.state;
+    }
+  }
   if (document.getElementById('panel-schedule').classList.contains('active')) {
     renderSchedule();
+  }
+  updatePendingCount();
+  if (document.getElementById('panel-manage').classList.contains('active')) {
+    renderRequests();
   }
 }
 

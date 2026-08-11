@@ -189,12 +189,55 @@ app.get('/api/state', async (req, res) => {
   }
 });
 
+/**
+ * 古いタブの全件保存で、別端末の新規依頼が消えないようにマージする。
+ * - 同じ id はクライアント側の内容を優先（割当・完了・削除など）
+ * - クライアントが知らない「新しい id」（id >= client.nextId）はサーバー側を残す
+ */
+function mergeIncomingState(current, incomingRaw) {
+  const currentState = normalizeState(current);
+  const incoming = normalizeState(incomingRaw);
+  const incomingIds = new Set(
+    incoming.requests
+      .map((r) => Number.parseInt(r?.id, 10))
+      .filter((id) => Number.isFinite(id) && id >= 1)
+  );
+  const clientNextId = Number.parseInt(incoming.nextId, 10);
+  const preserveFrom = Number.isFinite(clientNextId) && clientNextId >= 1 ? clientNextId : 1;
+
+  const preserved = currentState.requests.filter((r) => {
+    const id = Number.parseInt(r?.id, 10);
+    if (!Number.isFinite(id) || id < 1) return false;
+    if (incomingIds.has(id)) return false;
+    return id >= preserveFrom;
+  });
+
+  const mergedRequests = [...incoming.requests, ...preserved];
+  const maxId = mergedRequests.reduce((max, r) => {
+    const n = Number.parseInt(r?.id, 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+
+  return normalizeState({
+    ...incoming,
+    requests: mergedRequests,
+    nextId: Math.max(
+      Number.parseInt(currentState.nextId, 10) || 1,
+      Number.parseInt(incoming.nextId, 10) || 1,
+      maxId + 1
+    ),
+  });
+}
+
 app.post('/api/state', async (req, res) => {
   try {
+    let merged = null;
     await enqueueMutation(async () => {
-      await writeState(req.body);
+      const current = await readState();
+      merged = mergeIncomingState(current, req.body);
+      await writeState(merged);
     });
-    res.json({ ok: true });
+    res.json({ ok: true, state: merged });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
