@@ -120,9 +120,58 @@
     }
 
     .entry-time { font-size: 11px; font-weight: 700; color: var(--gray-500); margin-bottom: 2px; }
-    .entry-route { font-size: 12px; font-weight: 600; color: var(--gray-900); }
-    .entry-meta { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
-    .entry-note { font-size: 10px; color: #9ca3af; margin-top: 1px; }
+    .entry-route { font-size: 12px; font-weight: 600; color: var(--gray-900); word-break: break-word; }
+    .entry-meta { font-size: 11px; color: var(--gray-500); margin-top: 1px; word-break: break-word; }
+    .entry-note { font-size: 10px; color: #9ca3af; margin-top: 1px; word-break: break-word; }
+    .entry-req-id {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 3px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: rgba(30, 64, 175, 0.1);
+      color: #1e40af;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.4;
+      text-decoration: none;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .entry-req-id:hover { background: rgba(30, 64, 175, 0.18); text-decoration: underline; }
+    .req-id-link {
+      color: #1e40af;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .req-id-link:hover { text-decoration: underline; }
+    .request-item.req-highlight {
+      outline: 2px solid var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+    .manage-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .manage-search {
+      width: min(220px, 100%);
+      font-size: 13px;
+      padding: 6px 10px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 96px 1fr;
+      gap: 8px 10px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .detail-grid .k { color: var(--gray-500); font-size: 12px; }
+    .detail-grid .v { color: var(--gray-900); word-break: break-word; }
+    .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
     .day-num { font-size: 16px; font-weight: 700; display: block; }
     .day-label { font-size: 10px; font-weight: 500; }
@@ -435,6 +484,12 @@
       .form-grid { grid-template-columns: 1fr; }
       .req-actions { width: 100%; }
       .master-add { flex-wrap: wrap; }
+      .manage-toolbar { width: 100%; justify-content: stretch; }
+      .manage-search { width: 100%; min-height: 40px; }
+      .entry-req-id { font-size: 12px; padding: 2px 8px; min-height: 24px; }
+      .detail-grid { grid-template-columns: 1fr; gap: 4px; }
+      .detail-actions .btn { min-height: 40px; }
+      .schedule-table td { min-width: 150px; }
     }
 
     /* ===== Quick Place Selector ===== */
@@ -655,9 +710,17 @@
   <!-- ========== 依頼管理 ========== -->
   <div class="tab-panel" id="panel-manage">
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--gray-100);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--gray-100); flex-wrap:wrap; gap:10px;">
         <div class="card-title" style="margin:0; padding:0; border:none;" data-i18n="manageTitle">依頼一覧</div>
-        <div style="display:flex; gap:8px;">
+        <div class="manage-toolbar">
+          <input
+            type="search"
+            id="filter-search"
+            class="manage-search"
+            data-i18n-ph="phSearchRequest"
+            placeholder="#番号・申請者・目的地で検索"
+            oninput="renderRequests()"
+          />
           <select id="filter-status" onchange="renderRequests()" style="width:auto; font-size:13px; padding:6px 10px;">
             <option value="">すべて</option>
             <option value="申請中">申請中</option>
@@ -665,7 +728,6 @@
             <option value="完了">完了</option>
             <option value="キャンセル">キャンセル</option>
           </select>
-
         </div>
       </div>
       <div class="request-list" id="request-list">
@@ -768,6 +830,23 @@
       </div>
     </div>
   </div>
+
+<!-- ========== 依頼詳細モーダル ========== -->
+<div class="modal-overlay hidden" id="detail-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h2 id="detail-modal-title" data-i18n="detailTitle">配車依頼の詳細</h2>
+      <button class="modal-close" onclick="closeRequestDetail()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="detail-modal-body"></div>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;">
+      <div class="detail-actions" id="detail-modal-actions" style="flex:1;"></div>
+      <button class="btn btn-ghost" onclick="closeRequestDetail()" data-i18n="btnModalClose">閉じる</button>
+    </div>
+  </div>
+</div>
 
 <!-- ========== 割り当てモーダル ========== -->
 <div class="modal-overlay hidden" id="assign-modal">
@@ -920,6 +999,15 @@ const LANGS = {
     // Manage
     manageTitle: '依頼一覧',
     filterAll: 'すべて',
+    phSearchRequest: '#番号・申請者・目的地で検索',
+    emptySearch: '検索条件に一致する依頼はありません',
+    detailTitle: '配車依頼の詳細',
+    btnModalClose: '閉じる',
+    btnOpenDetail: '詳細',
+    detailNotFound: '指定の依頼番号が見つかりません',
+    detailStatus: 'ステータス',
+    detailVehicle: '車両',
+    detailDriver: 'ドライバー',
     statusPending: '申請中',
     statusConfirmed: '確定',
     statusDone: '完了',
@@ -1067,6 +1155,15 @@ const LANGS = {
 
     manageTitle: 'Danh sách yêu cầu',
     filterAll: 'Tất cả',
+    phSearchRequest: 'Tìm theo #số / người / điểm đến',
+    emptySearch: 'Không có yêu cầu khớp điều kiện tìm',
+    detailTitle: 'Chi tiết yêu cầu xe',
+    btnModalClose: 'Đóng',
+    btnOpenDetail: 'Chi tiết',
+    detailNotFound: 'Không tìm thấy mã yêu cầu',
+    detailStatus: 'Trạng thái',
+    detailVehicle: 'Xe',
+    detailDriver: 'Tài xế',
     statusPending: 'Đang chờ',
     statusConfirmed: 'Đã xác nhận',
     statusDone: 'Hoàn thành',
@@ -1359,6 +1456,39 @@ async function onScheduleMemoInputBlur(el) {
   }
 }
 
+function requestIdBadgeHtml(id) {
+  const n = Number.parseInt(id, 10);
+  if (!Number.isFinite(n) || n < 1) return '';
+  return `<a href="#request-${n}" class="entry-req-id" onclick="event.preventDefault(); event.stopPropagation(); openRequestDetail(${n});">#${n}</a>`;
+}
+
+function requestIdLinkHtml(id) {
+  const n = Number.parseInt(id, 10);
+  if (!Number.isFinite(n) || n < 1) return '';
+  return `<a href="#request-${n}" class="req-id-link" onclick="event.preventDefault(); event.stopPropagation(); openRequestDetail(${n});">#${n}</a>`;
+}
+
+function buildSysRequestScheduleCardHtml(r, opts = {}) {
+  const isPending = r.status === '申請中';
+  const cls   = isPending ? 'sys-pend' : 'sys-req';
+  const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
+  const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
+  let html = `<div class="sched-entry ${cls}" data-req-id="${r.id}">`;
+  html += requestIdBadgeHtml(r.id);
+  html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
+  html += `<div class="entry-route">${escapeHtmlText(r.from)} → ${escapeHtmlText(r.to)}</div>`;
+  html += `<div class="entry-meta">👤 ${escapeHtmlText(r.requester)} ／ ${r.passengers} ${t('reqSans')}</div>`;
+  if (opts.showVehicle && r.vehicle) {
+    html += `<div class="entry-note">🚗 ${escapeHtmlText(r.vehicle)}${r.driver ? ' ／ ' + escapeHtmlText(r.driver) : ''}</div>`;
+  } else if (r.driver) {
+    html += `<div class="entry-note">🧑‍✈️ ${escapeHtmlText(r.driver)}</div>`;
+  }
+  if (r.notes && String(r.notes).trim()) html += `<div class="entry-note">📋 ${escapeHtmlText(r.notes)}</div>`;
+  html += schedMemoTextareaBlockForRequest(r.id, r.scheduleMemo || '');
+  html += `</div>`;
+  return html;
+}
+
 /** 1日分の <tr> のみ */
 function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
   const dateKey = ymdKey(year, month, day);
@@ -1403,18 +1533,7 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
     }
 
     for (const r of matched) {
-      const isPending = r.status === '申請中';
-      const cls   = isPending ? 'sys-pend' : 'sys-req';
-      const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
-      const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
-      html += `<div class="sched-entry ${cls}">`;
-      html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
-      html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
-      html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
-      if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
-      if (r.notes && String(r.notes).trim()) html += `<div class="entry-note">📋 ${r.notes}</div>`;
-      html += schedMemoTextareaBlockForRequest(r.id, r.scheduleMemo || '');
-      html += `</div>`;
+      html += buildSysRequestScheduleCardHtml(r);
       hasCells = true;
     }
 
@@ -1428,19 +1547,7 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
     html += `<div class="sched-entry empty-cell">—</div>`;
   } else {
     for (const r of unmatched) {
-      const isPending = r.status === '申請中';
-      const cls   = isPending ? 'sys-pend' : 'sys-req';
-      const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
-      const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
-      html += `<div class="sched-entry ${cls}">`;
-      html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
-      html += `<div class="entry-route">${r.from} → ${r.to}</div>`;
-      html += `<div class="entry-meta">👤 ${r.requester} ／ ${r.passengers} ${t('reqSans')}</div>`;
-      if (r.vehicle) html += `<div class="entry-note">🚗 ${r.vehicle}${r.driver ? ' ／ ' + r.driver : ''}</div>`;
-      else if (r.driver) html += `<div class="entry-note">🧑‍✈️ ${r.driver}</div>`;
-      if (r.notes && String(r.notes).trim()) html += `<div class="entry-note">📋 ${r.notes}</div>`;
-      html += schedMemoTextareaBlockForRequest(r.id, r.scheduleMemo || '');
-      html += `</div>`;
+      html += buildSysRequestScheduleCardHtml(r, { showVehicle: true });
     }
   }
   html += `</td>`;
@@ -1913,13 +2020,48 @@ function startNewRequest() {
 }
 
 // ==================== Request List ====================
+function normalizeSearchQuery(raw) {
+  return String(raw || '').trim().toLowerCase();
+}
+
+function matchesRequestSearch(req, rawQuery) {
+  const q = normalizeSearchQuery(rawQuery);
+  if (!q) return true;
+
+  const idStr = String(req.id ?? '');
+  const qDigits = q.replace(/^#/, '');
+  if (/^#?\d+$/.test(q) && idStr === qDigits) return true;
+
+  const haystack = [
+    `#${req.id}`,
+    idStr,
+    req.requester,
+    req.from,
+    req.to,
+    req.notes,
+    req.vehicle,
+    req.driver,
+    req.status,
+  ]
+    .map(v => String(v || '').toLowerCase())
+    .join(' ');
+
+  return haystack.includes(q);
+}
+
 function renderRequests() {
   const list = document.getElementById('request-list');
   const filter = document.getElementById('filter-status').value;
-  const reqs = filter ? state.requests.filter(r => r.status === filter) : state.requests;
+  const searchEl = document.getElementById('filter-search');
+  const search = searchEl ? searchEl.value : '';
+  let reqs = filter ? state.requests.filter(r => r.status === filter) : state.requests.slice();
+  reqs = reqs.filter(r => matchesRequestSearch(r, search));
 
   if (reqs.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="icon">📭</div>${filter ? t('emptyFiltered') : t('emptyRequests')}</div>`;
+    const emptyMsg = search
+      ? t('emptySearch')
+      : (filter ? t('emptyFiltered') : t('emptyRequests'));
+    list.innerHTML = `<div class="empty-state"><div class="icon">📭</div>${emptyMsg}</div>`;
     return;
   }
 
@@ -1934,29 +2076,31 @@ function renderRequests() {
       : '';
     const notesLine = r.notes ? `<div class="req-detail">📝 ${r.notes}</div>` : '';
 
-    let actions = '';
+    let actions = `
+      <button class="btn btn-ghost btn-sm" onclick="openRequestDetail(${r.id})">${t('btnOpenDetail')}</button>
+    `;
     if (r.status === '申請中') {
-      actions = `
+      actions += `
         <button class="btn btn-primary btn-sm" onclick="openAssignModal(${r.id})">${t('btnAssign')}</button>
         <button class="btn btn-danger btn-sm" onclick="cancelRequest(${r.id})">${t('btnCancel')}</button>
       `;
     } else if (r.status === '確定') {
-      actions = `
+      actions += `
         <button class="btn btn-ghost btn-sm" onclick="openAssignModal(${r.id})">${t('btnChange')}</button>
         <button class="btn btn-success btn-sm" onclick="openDoneModal(${r.id})">${t('btnDone')}</button>
         <button class="btn btn-danger btn-sm" onclick="cancelRequest(${r.id})">${t('btnCancel')}</button>
       `;
     } else if (r.status === '完了') {
-      actions = `
+      actions += `
         <button class="btn btn-primary btn-sm" onclick="openEditCompletedModal(${r.id})">${t('btnEditCompleted')}</button>
       `;
     }
 
     return `
-      <div class="request-item status-${statusClass}">
-        <div style="flex:1;">
+      <div class="request-item status-${statusClass}" id="request-item-${r.id}" data-req-id="${r.id}">
+        <div style="flex:1; min-width:0;">
           <div class="req-meta">
-            <span class="req-id">#${r.id}</span>
+            ${requestIdLinkHtml(r.id)}
             <span class="badge badge-${statusClass}">${statusLabel[r.status] || r.status}</span>
             <span class="req-datetime">📅 ${pickupLabel}${returnLabel}</span>
           </div>
@@ -1976,6 +2120,74 @@ function renderRequests() {
       </div>
     `;
   }).join('');
+}
+
+function closeRequestDetail() {
+  const modal = document.getElementById('detail-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function openRequestDetail(id) {
+  const reqId = Number.parseInt(id, 10);
+  const req = state.requests.find(r => Number(r.id) === reqId);
+  if (!req) {
+    toast(t('detailNotFound'), 'error');
+    return;
+  }
+
+  const statusLabel = { '申請中': t('statusPending'), '確定': t('statusConfirmed'), '完了': t('statusDone'), 'キャンセル': t('statusCancelled') };
+  const titleEl = document.getElementById('detail-modal-title');
+  if (titleEl) titleEl.textContent = `${t('detailTitle')} #${req.id}`;
+
+  const body = document.getElementById('detail-modal-body');
+  body.innerHTML = `
+    <div class="detail-grid">
+      <div class="k">ID</div><div class="v"><strong>#${req.id}</strong></div>
+      <div class="k">${t('detailStatus')}</div><div class="v">${statusLabel[req.status] || req.status}</div>
+      <div class="k">${t('labelRequester')}</div><div class="v">${escapeHtmlText(req.requester)}</div>
+      <div class="k">${t('labelPassengers')}</div><div class="v">${req.passengers} ${t('reqSans')}</div>
+      <div class="k">${t('labelPickup')}</div><div class="v">${escapeHtmlText(formatDt(req.pickupDt))}</div>
+      <div class="k">${t('labelReturn')}</div><div class="v">${req.returnDt ? escapeHtmlText(formatDt(req.returnDt)) : '—'}</div>
+      <div class="k">${t('labelFrom')}</div><div class="v">${escapeHtmlText(req.from)}</div>
+      <div class="k">${t('labelTo')}</div><div class="v">${escapeHtmlText(req.to)}</div>
+      <div class="k">${t('detailVehicle')}</div><div class="v">${escapeHtmlText(req.vehicle || '—')}</div>
+      <div class="k">${t('detailDriver')}</div><div class="v">${escapeHtmlText(req.driver || '—')}</div>
+      <div class="k">${t('labelNotes')}</div><div class="v">${escapeHtmlText(req.notes || '—')}</div>
+    </div>
+  `;
+
+  const actions = document.getElementById('detail-modal-actions');
+  let btns = '';
+  if (req.status === '申請中') {
+    btns += `<button class="btn btn-primary btn-sm" onclick="closeRequestDetail(); openAssignModal(${req.id})">${t('btnAssign')}</button>`;
+    btns += `<button class="btn btn-danger btn-sm" onclick="closeRequestDetail(); cancelRequest(${req.id})">${t('btnCancel')}</button>`;
+  } else if (req.status === '確定') {
+    btns += `<button class="btn btn-ghost btn-sm" onclick="closeRequestDetail(); openAssignModal(${req.id})">${t('btnChange')}</button>`;
+    btns += `<button class="btn btn-success btn-sm" onclick="closeRequestDetail(); openDoneModal(${req.id})">${t('btnDone')}</button>`;
+    btns += `<button class="btn btn-danger btn-sm" onclick="closeRequestDetail(); cancelRequest(${req.id})">${t('btnCancel')}</button>`;
+  } else if (req.status === '完了') {
+    btns += `<button class="btn btn-primary btn-sm" onclick="closeRequestDetail(); openEditCompletedModal(${req.id})">${t('btnEditCompleted')}</button>`;
+  }
+  actions.innerHTML = btns;
+
+  document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function focusRequestInManageList(id) {
+  const reqId = Number.parseInt(id, 10);
+  if (!Number.isFinite(reqId)) return;
+  switchTab('manage');
+  const searchEl = document.getElementById('filter-search');
+  if (searchEl) searchEl.value = String(reqId);
+  const statusEl = document.getElementById('filter-status');
+  if (statusEl) statusEl.value = '';
+  renderRequests();
+  const el = document.getElementById(`request-item-${reqId}`);
+  if (el) {
+    el.classList.add('req-highlight');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => el.classList.remove('req-highlight'), 2500);
+  }
 }
 
 async function cancelRequest(id) {
@@ -2485,6 +2697,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('edit-completed-modal').addEventListener('click', function(e) {
     if (e.target === this) closeEditCompletedModal();
+  });
+  document.getElementById('detail-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeRequestDetail();
   });
 });
 </script>
