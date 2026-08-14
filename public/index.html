@@ -2184,12 +2184,14 @@ function focusRequestInManageList(id) {
   const statusEl = document.getElementById('filter-status');
   if (statusEl) statusEl.value = '';
   renderRequests();
-  const el = document.getElementById(`request-item-${reqId}`);
-  if (el) {
+  // 描画後にスクロール＆ハイライト（画面上で目立たせる）
+  requestAnimationFrame(() => {
+    const el = document.getElementById(`request-item-${reqId}`);
+    if (!el) return;
     el.classList.add('req-highlight');
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setTimeout(() => el.classList.remove('req-highlight'), 2500);
-  }
+  });
 }
 
 async function cancelRequest(id) {
