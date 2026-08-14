@@ -1004,6 +1004,7 @@ const LANGS = {
     detailTitle: '配車依頼の詳細',
     btnModalClose: '閉じる',
     btnOpenDetail: '詳細',
+    btnJumpManage: '依頼管理で表示',
     detailNotFound: '指定の依頼番号が見つかりません',
     detailStatus: 'ステータス',
     detailVehicle: '車両',
@@ -1160,6 +1161,7 @@ const LANGS = {
     detailTitle: 'Chi tiết yêu cầu xe',
     btnModalClose: 'Đóng',
     btnOpenDetail: 'Chi tiết',
+    btnJumpManage: 'Hiện trong danh sách',
     detailNotFound: 'Không tìm thấy mã yêu cầu',
     detailStatus: 'Trạng thái',
     detailVehicle: 'Xe',
@@ -2157,7 +2159,7 @@ function openRequestDetail(id) {
   `;
 
   const actions = document.getElementById('detail-modal-actions');
-  let btns = '';
+  let btns = `<button class="btn btn-ghost btn-sm" onclick="closeRequestDetail(); focusRequestInManageList(${req.id})">${t('btnJumpManage')}</button>`;
   if (req.status === '申請中') {
     btns += `<button class="btn btn-primary btn-sm" onclick="closeRequestDetail(); openAssignModal(${req.id})">${t('btnAssign')}</button>`;
     btns += `<button class="btn btn-danger btn-sm" onclick="closeRequestDetail(); cancelRequest(${req.id})">${t('btnCancel')}</button>`;
