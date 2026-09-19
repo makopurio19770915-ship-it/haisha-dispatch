@@ -8,6 +8,10 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'db.json');
 const MONGODB_URI = process.env.MONGODB_URI;
+/** 工場ごとにデータを分けるDB名（未設定時は従来どおり dispatch_app） */
+const MONGODB_DB = (process.env.MONGODB_DB || 'dispatch_app').trim() || 'dispatch_app';
+/** 画面タイトル用の工場ラベル（例: AHHP）。未設定なら表示しない */
+const FACTORY_LABEL = (process.env.FACTORY_LABEL || '').trim();
 
 const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1, scheduleExcelMemos: {} };
 
@@ -104,7 +108,7 @@ async function notifyDiscordNewRequest(req) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      username: '配車管理',
+      username: FACTORY_LABEL ? `配車管理（${FACTORY_LABEL}）` : '配車管理',
       embeds: [embed],
     }),
   });
@@ -134,14 +138,14 @@ async function initMongo() {
   const { MongoClient } = require('mongodb');
   mongoClient = new MongoClient(MONGODB_URI);
   await mongoClient.connect();
-  mongoDb = mongoClient.db('dispatch_app');
+  mongoDb = mongoClient.db(MONGODB_DB);
   const col = mongoDb.collection('state');
   const doc = await col.findOne({ _id: 'main' });
   if (!doc) {
     await col.insertOne({ _id: 'main', data: INITIAL_STATE });
   }
   useMongo = true;
-  console.log('  保存先: MongoDB Atlas（クラウド永続）');
+  console.log(`  保存先: MongoDB Atlas（クラウド永続 / DB: ${MONGODB_DB}）`);
 }
 
 function initFileStorage() {
@@ -179,6 +183,11 @@ async function writeState(body) {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+/** 工場ラベルなど、画面表示用の設定を返す */
+app.get('/api/config', (req, res) => {
+  res.json({ factoryLabel: FACTORY_LABEL || null });
+});
 
 app.get('/api/state', async (req, res) => {
   try {
@@ -296,7 +305,9 @@ async function start() {
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('\n========================================');
-    console.log('  配車管理システム 起動中');
+    console.log(
+      FACTORY_LABEL ? `  配車管理システム（${FACTORY_LABEL}）起動中` : '  配車管理システム 起動中'
+    );
     console.log('========================================');
     console.log(`  このPCだけ: http://localhost:${PORT}`);
     console.log('');
@@ -318,6 +329,9 @@ async function start() {
     }
     if (process.env.RENDER_EXTERNAL_URL) {
       console.log(`  クラウド: ${process.env.RENDER_EXTERNAL_URL}`);
+    }
+    if (FACTORY_LABEL) {
+      console.log(`  工場ラベル: ${FACTORY_LABEL}`);
     }
     if (DISCORD_WEBHOOK_URL) {
       console.log('  Discord: 新規依頼時に Webhook 通知を送ります');

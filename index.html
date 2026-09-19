@@ -1311,6 +1311,8 @@ function applyLang() {
   const lb = document.getElementById('lang-toggle');
   if (lb) lb.textContent = L.langBtn;
 
+  document.title = L.appTitle;
+
   // スケジュールの列ヘッダー
   const schedDateTh = document.getElementById('th-date');
   if (schedDateTh) schedDateTh.textContent = L.schedColDate;
@@ -1912,6 +1914,21 @@ async function loadState() {
     state.vehicles = [...COMPANY_VEHICLES];
     state.drivers  = ['Mr Sinh', 'Mr Duong', 'HORIE'];
     state.places   = ['本社 / Công ty', '空港 / Sân bay'];
+  }
+}
+
+/** 工場ラベル（例: AHHP）をサーバー設定から取得してタイトルに反映 */
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) return;
+    const cfg = await res.json();
+    const label = String(cfg.factoryLabel || '').trim();
+    if (!label) return;
+    LANGS.ja.appTitle = `配車管理システム（${label}）`;
+    LANGS.vi.appTitle = `Hệ thống quản lý xe (${label})`;
+  } catch {
+    /* 設定取得失敗時はデフォルトタイトルのまま */
   }
 }
 

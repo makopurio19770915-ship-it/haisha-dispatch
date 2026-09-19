@@ -1,4 +1,4 @@
-# Render.com 用（GitHub 連携後、ダッシュボードで MONGODB_URI を追加してください）
+# Render.com 用（GitHub 連携後、ダッシュボードで環境変数を追加してください）
 services:
   - type: web
     name: dispatch-manager
@@ -9,4 +9,7 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # ダッシュボードで追加: MONGODB_URI（MongoDB Atlas の接続文字列）
+      # ダッシュボードで追加:
+      #   MONGODB_URI … MongoDB Atlas の接続文字列（必須）
+      #   MONGODB_DB  … 工場ごとのDB名（未設定時は dispatch_app）
+      #   FACTORY_LABEL … 画面タイトル用（例: AHHP。未設定なら表示なし）
