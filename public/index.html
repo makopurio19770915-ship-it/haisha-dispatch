@@ -1874,6 +1874,13 @@ const COMPANY_VEHICLES = [
 ];
 const COMPANY_DRIVERS = ['Mr Sinh', 'Mr Duong', 'HORIE'];
 
+/** 工場ラベル（例: AHHP）。別工場では既存工場の車両マスタを自動投入しない */
+let factoryLabel = '';
+
+function isDefaultFactory() {
+  return !factoryLabel;
+}
+
 async function loadState() {
   try {
     const res = await fetch('/api/state');
@@ -1881,39 +1888,47 @@ async function loadState() {
     if (saved && saved.requests) {
       state = saved;
       let updated = false;
-      for (const v of COMPANY_VEHICLES) {
-        if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
+      if (isDefaultFactory()) {
+        for (const v of COMPANY_VEHICLES) {
+          if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
+        }
+        for (const d of COMPANY_DRIVERS) {
+          if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
+        }
+        if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
+        if (state.vehicles.includes('LIMO GREEN')) {
+          state.vehicles = state.vehicles.filter(v => v !== 'LIMO GREEN');
+          if (!state.vehicles.includes(LIMO_VEHICLE)) state.vehicles.unshift(LIMO_VEHICLE);
+          updated = true;
+        }
+        for (const req of state.requests) {
+          if (req.vehicle === 'LIMO GREEN') {
+            req.vehicle = LIMO_VEHICLE;
+            updated = true;
+          }
+        }
+      } else {
+        if (!Array.isArray(state.vehicles)) { state.vehicles = []; updated = true; }
+        if (!Array.isArray(state.drivers)) { state.drivers = []; updated = true; }
+        if (!Array.isArray(state.places)) { state.places = []; updated = true; }
       }
-      for (const d of COMPANY_DRIVERS) {
-        if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
-      }
-      if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
       if (!state.scheduleExcelMemos || typeof state.scheduleExcelMemos !== 'object') {
         state.scheduleExcelMemos = {};
         updated = true;
       }
-      if (state.vehicles.includes('LIMO GREEN')) {
-        state.vehicles = state.vehicles.filter(v => v !== 'LIMO GREEN');
-        if (!state.vehicles.includes(LIMO_VEHICLE)) state.vehicles.unshift(LIMO_VEHICLE);
-        updated = true;
-      }
-      for (const req of state.requests) {
-        if (req.vehicle === 'LIMO GREEN') {
-          req.vehicle = LIMO_VEHICLE;
-          updated = true;
-        }
-      }
       if (updated) await saveState();
-    } else {
+    } else if (isDefaultFactory()) {
       state.vehicles = [...COMPANY_VEHICLES];
       state.drivers  = ['Mr Sinh', 'Mr Duong', 'HORIE'];
       state.places   = ['本社 / Công ty', '空港 / Sân bay'];
       await saveState();
     }
   } catch {
-    state.vehicles = [...COMPANY_VEHICLES];
-    state.drivers  = ['Mr Sinh', 'Mr Duong', 'HORIE'];
-    state.places   = ['本社 / Công ty', '空港 / Sân bay'];
+    if (isDefaultFactory()) {
+      state.vehicles = [...COMPANY_VEHICLES];
+      state.drivers  = ['Mr Sinh', 'Mr Duong', 'HORIE'];
+      state.places   = ['本社 / Công ty', '空港 / Sân bay'];
+    }
   }
 }
 
@@ -1924,6 +1939,7 @@ async function loadConfig() {
     if (!res.ok) return;
     const cfg = await res.json();
     const label = String(cfg.factoryLabel || '').trim();
+    factoryLabel = label;
     if (!label) return;
     LANGS.ja.appTitle = `配車管理システム（${label}）`;
     LANGS.vi.appTitle = `Hệ thống quản lý xe (${label})`;
@@ -1988,13 +2004,15 @@ async function submitRequest(e) {
     else await loadState();
     createdReq = state.requests.find(r => r.createdAt === payload.createdAt && r.requester === payload.requester) || state.requests[0];
     let updated = false;
-    for (const v of COMPANY_VEHICLES) {
-      if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
+    if (isDefaultFactory()) {
+      for (const v of COMPANY_VEHICLES) {
+        if (!state.vehicles.includes(v)) { state.vehicles.unshift(v); updated = true; }
+      }
+      for (const d of COMPANY_DRIVERS) {
+        if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
+      }
+      if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
     }
-    for (const d of COMPANY_DRIVERS) {
-      if (!state.drivers.includes(d)) { state.drivers.unshift(d); updated = true; }
-    }
-    if (!state.places) { state.places = ['本社 / Công ty', '空港 / Sân bay']; updated = true; }
     if (updated) await saveState();
   } catch {
     toast(t('toastSubmitError'), 'error');
