@@ -800,12 +800,7 @@
           </div>
         </div>
       </div>
-      <div class="schedule-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>CROSS 61LD.08418</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#14b8a6;"></div>BUS 61LD.02599</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div>SMALL TRUCK 61LD.01001</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#a855f7;"></div>BIG TRUCK 61LD.04922</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#84cc16;"></div>LIMO GREEN 51B-970.37</div>
+      <div class="schedule-legend" id="schedule-legend">
         <div class="legend-item"><div class="legend-dot" style="background:#16a34a;"></div><span data-i18n="legendConfirmed">確定済み依頼</span></div>
         <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border:1px solid #d97706;"></div><span data-i18n="legendPending">申請中依頼</span></div>
         <div class="legend-item" style="margin-left:auto;">
@@ -815,13 +810,8 @@
       <div class="schedule-wrap">
         <table class="schedule-table" id="schedule-table">
           <thead>
-            <tr>
+            <tr id="schedule-thead-row">
               <th class="col-date" id="th-date">日付</th>
-              <th class="col-cross">🚗 CROSS<br>61LD.08418</th>
-              <th class="col-bus">🚌 BUS<br>61LD.02599</th>
-              <th class="col-small">🚚 SMALL TRUCK<br>61LD.01001</th>
-              <th class="col-big">🚛 BIG TRUCK<br>61LD.04922</th>
-              <th class="col-limo">🚘 LIMO GREEN<br>51B-970.37</th>
               <th class="col-sys" id="th-sys">📋 システム申請</th>
             </tr>
           </thead>
@@ -1335,12 +1325,71 @@ function applyLang() {
 const EXCEL_SCHEDULE = {"2026-04-01":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR HORIE, MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"13:40","to":"","route":"MR TRINH ĐI TTHC","requester":"","purpose":"","note":"A SINH"}],"BUS 61LD.02599":[{"from":"09:00","to":"10:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-02":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"cty Haosi cụm A4, Đường số 3B, KCN Đồng Xoài III","requester":"MR KHÁNH","purpose":"NHẬN","note":"máy ràng cẩn thận a Sinh"},{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Nhận","note":"15PL a Sinh"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"11:00","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":""}]},"2026-04-03":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"13:00","to":"14:30","route":"phụ sx","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:00","to":"","route":"YOSHIDA","requester":"MS THƯƠNG","purpose":"GIAO-NHẬN","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"11:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":""}]},"2026-04-04":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"","to":"","route":"PANA","requester":"MS NHUNG-QC","purpose":"GIAO","note":"mẫu"},{"from":"13:00","to":"14:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"LẤY ỐNG NƯỚC - Thuỳ Trang","requester":"MR THANH-BT","purpose":"NHẬN","note":"A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"07:30","to":"11:30","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-05":{},"2026-04-06":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:00","to":"09:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"12:00","to":"","route":"Tranximex","requester":"Ms Hạnh","purpose":"Giao","note":"Kato - 1PL A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"10:30","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":""},{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-07":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:00","to":"09:00","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"09:00","to":"","route":"BÍCH ĐI HQ","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"10:30","to":"","route":"NGUYÊN SANG","requester":"RD","purpose":"GIAO","note":"khuôn + vật tư"},{"from":"","to":"","route":"FIGLA","requester":"MS NGỌC","purpose":"GIAO","note":""},{"from":"","to":"","route":"OM","requester":"Ms Hạnh","purpose":"Giao-nhận","note":"20 thùng"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"10:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"120 THÙNG"},{"from":"15:30","to":"17:00","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"17:00","to":"18:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-08":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:00","to":"","route":"Yoshida","requester":"Ms thương","purpose":"Giao nhận","note":""},{"from":"13:00","to":"","route":"PANA","requester":"Ms Hạnh","purpose":"Giao","note":"9PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao nhận","note":"12PL 1PL"},{"from":"16:30","to":"18:00","route":"PHỤ SX","requester":"","purpose":"","note":""}]},"2026-04-09":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:00","to":"09:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"12:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":""},{"from":"","to":"","route":"CTY GỖ GIANG ĐIỀN","requester":"MS THƯƠNG","purpose":"NHẬN","note":"mẫu"},{"from":"16:30","to":"18:00","route":"PHỤ SX","requester":"","purpose":"","note":""}]},"2026-04-10":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"08:30","to":"","route":"PHÒNG XNC","requester":"","purpose":"","note":"MR HORIE MS THẮM"},{"from":"15:00","to":"16:30","route":"PHỤ SX","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"06:00","to":"10:00","route":"TC SX","requester":"","purpose":"","note":"A DƯƠNG"},{"from":"10:00","to":"","route":"ESTEC","requester":"MS VÂN","purpose":"GIAO","note":"45 thùng A DƯƠNG"},{"from":"","to":"","route":"Star Elec","requester":"Ms thương","purpose":"Giao nhận","note":"28 thùng A DƯƠNG"},{"from":"16:30","to":"18:00","route":"PHỤ SX","requester":"","purpose":"","note":"A DƯƠNG"}],"BIG TRUCK 5T 61LD.04922":[{"from":"13:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"120 THÙNG A SINH"},{"from":"","to":"","route":"PANA","requester":"MS HẠNH","purpose":"NHẬN","note":"2PL A SINH"}]},"2026-04-11":{},"2026-04-12":{},"2026-04-13":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN MR HORIE, MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":"A SINH"},{"from":"16:45","to":"","route":"ĐƯA MR YAGYU, NHÂN VIÊN VỀ","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"15:30","to":"","route":"MR HORIE VỀ CĂN HỘ","requester":"","purpose":"","note":""},{"from":"sau đó","to":"","route":"ĐI SÂN BAY NỘI ĐỊA GA T1","requester":"","purpose":"","note":"19:35 bay"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"ROHTO","requester":"MS HẠNH","purpose":"GIAO","note":"A SINH"},{"from":"","to":"","route":"NGUYÊN SANG","requester":"MR THẠNH RD","purpose":"NHẬN","note":"KHUÔN"},{"from":"13:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"09:00","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":"A DƯƠNG"}]},"2026-04-14":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:30","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao","note":"11pl"},{"from":"12:00","to":"","route":"TS MOLYMER","requester":"MS VÂN","purpose":"Giao-Nhận","note":""},{"from":"","to":"","route":"CÓ HS GỬI BIDV ĐẠI LỘ","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"09:30","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao-Nhận","note":"20pl 3pl"},{"from":"13:00","to":"","route":"Yoshida","requester":"Ms thương","purpose":"Giao nhận","note":""},{"from":"16:30","to":"17:00","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"17:00","to":"18:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-15":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"08:00","to":"09:30","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"09:30","to":"","route":"TTHC NỘP HS - QUẦY 24","requester":"","purpose":"","note":""}],"BUS 61LD.02599":[{"from":"10:00","to":"","route":"ĐĂNG KIỂM XE","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"GIAO","note":"15PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"07:30","route":"PHỤ SX","requester":"","purpose":"","note":""},{"from":"09:00","to":"12:00","route":"LẮP MÁY","requester":"","purpose":"","note":""},{"from":"14:00","to":"18:00","route":"TC SX","requester":"","purpose":"","note":""}]},"2026-04-16":{"CROSS 61LD.08418":[{"from":"06:00","to":"16:45","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"08:00","to":"","route":"MR YAGYU ĐI ĐỒNG NAI - Mogamiseiki","requester":"","purpose":"","note":"10:30 HỌP"}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"14:00","to":"","route":"VSIP 2 - Bến Cát, Bình Dương","requester":"MS THƯƠNG","purpose":"NHẬN","note":"TẤM GỖ"},{"from":"","to":"","route":"PANA","requester":"MS HẠNH","purpose":"NHẬN","note":"TRAY"},{"from":"","to":"","route":"MANG TẤM CAO SU RA HUỲNH VĂN LŨY","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"09:00","to":"","route":"WAHL","requester":"MS VÂN","purpose":"GIAO","note":"4PL"}]},"2026-04-17":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"14:00","to":"","route":"BIDV HÒA PHÚ","requester":"","purpose":"","note":"CHỞ MR YAGYU A DƯƠNG"},{"from":"15:30","to":"","route":"ĐÓN KHÁCH SB QTE → KS BECAMEX (Mr Azuma)","requester":"","purpose":"","note":"17:20 hạ cánh VN3561"},{"from":"","to":"","route":"CẦM BẢNG TÊN ĐÓN KHÁCH","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"16:45","to":"","route":"ĐƯA MR YAGYU, NHÂN VIÊN VỀ","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"08:00","to":"","route":"SHARP (80 thùng)","requester":"MS.VÂN","purpose":"GIAO","note":"A DƯƠNG"},{"from":"11:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":"A SINH"},{"from":"","to":"","route":"MUSASHI","requester":"MS NGỌC RD","purpose":"GIAO","note":"MẪU"}]},"2026-04-18":{"CROSS 61LD.08418":[{"from":"09:50","to":"","route":"ĐÓN KHÁCH TỪ KS BECAMEX → ASTEE","requester":"","purpose":"","note":"A DƯƠNG"},{"from":"13:30","to":"","route":"ĐÓN MR HORIE TỪ CĂN HỘ LÊN CTY","requester":"","purpose":"","note":"A DƯƠNG"},{"from":"16:30","to":"","route":"ĐƯA KHÁCH VỀ KHÁCH SẠN","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"06:00","to":"16:45","route":"ĐƯA ĐÓN MR YAGYU, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"08:30","to":"13:00","route":"MR TRINH ĐI CTY GỖ - GIANG ĐIỀN","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"SHARP","requester":"MS.VÂN","purpose":"GIAO","note":"6 thùng"},{"from":"","to":"","route":"SHARP","requester":"MS NHUNG-QC","purpose":"GIAO","note":"MẪU"}]},"2026-04-19":{"CROSS 61LD.08418":[{"from":"08:00","to":"","route":"ĐƯA KHÁCH RA SÂN BAY QTE","requester":"","purpose":"","note":"11:05 BAY"}]},"2026-04-20":{"CROSS 61LD.08418":[{"from":"05:00","to":"","route":"MR YAGYU ĐI SÂN BAY NỘI ĐỊA GA T1","requester":"","purpose":"","note":"7:30 bay a Dương"},{"from":"16:45","to":"","route":"ĐƯA ĐÓN MR HORIE, NHÂN VIÊN VỀ","requester":"","purpose":"","note":""}],"BUS 61LD.02599":[{"from":"06:00","to":"","route":"ĐÓN MR HORIE, NHÂN VIÊN","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"PANA","requester":"MS HẠNH","purpose":"GIAO","note":"10PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"09:00","to":"","route":"WAHL (4PL)","requester":"MS.VÂN","purpose":"Giao nhận","note":""}]},"2026-04-21":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN MR HORIE, NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"15:30","to":"","route":"MR HORIE ĐI SG","requester":"","purpose":"","note":"A DƯƠNG"}],"BUS 61LD.02599":[{"from":"16:45","to":"","route":"ĐƯA NHÂN VIÊN VỀ","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"09:30","to":"","route":"HÒA ĐẠT","requester":"MS THƯƠNG","purpose":"NHẬN","note":"30 KHAY"}],"BIG TRUCK 5T 61LD.04922":[{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Giao-nhận","note":"7PL 9PL"}]},"2026-04-22":{"CROSS 61LD.08418":[{"from":"06:00","to":"","route":"ĐÓN NHÂN VIÊN","requester":"","purpose":"","note":""},{"from":"11:00","to":"","route":"ĐÓN MR HORIE TỪ CĂN HỘ","requester":"","purpose":"","note":""},{"from":"11:30","to":"","route":"MS NHI ĐI ĐỒNG NAI - Tokoseiki VN","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"06:00","to":"09:00","route":"TC SX","requester":"","purpose":"","note":""},{"from":"09:00","to":"14:00","route":"LẮP MÁY","requester":"","purpose":"","note":""},{"from":"15:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"120 THÙNG"}]},"2026-04-23":{"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"Pana","requester":"Ms Hạnh","purpose":"Nhận","note":"3PL"}],"BIG TRUCK 5T 61LD.04922":[{"from":"11:00","to":"","route":"FIGLA","requester":"MS ĐÔNG","purpose":"GIAO-NHẬN","note":""}]},"2026-04-24":{"CROSS 61LD.08418":[{"from":"","to":"","route":"ĐÓN MR YAGYU SB NỘI ĐỊA GA T1","requester":"","purpose":"","note":"18:25 HẠ CÁNH"},{"from":"12:10","to":"","route":"MR HORIE VỀ CĂN HỘ","requester":"","purpose":"","note":""}],"SMALL TRUCK 1.1T 61LD.01001":[{"from":"13:00","to":"","route":"Yuwa (5pl)","requester":"MS.VÂN","purpose":"GIAO","note":""},{"from":"","to":"","route":"CTY GỖ","requester":"","purpose":"","note":""}],"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"WAHL","requester":"MS VÂN","purpose":"","note":""}]},"2026-04-25":{},"2026-04-26":{},"2026-04-27":{"CROSS 61LD.08418":[{"from":"","to":"","route":"MR YAGYU ĐI SB QTE","requester":"","purpose":"","note":"1H BAY"},{"from":"09:00","to":"","route":"SÂN BAY","requester":"MS ĐÔNG","purpose":"GIAO","note":"841"}],"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"LẮP MÁY","requester":"","purpose":"","note":""},{"from":"","to":"","route":"A DƯƠNG OFF","requester":"","purpose":"","note":""}]},"2026-04-28":{"SMALL TRUCK 1.1T 61LD.01001":[{"from":"08:00","to":"","route":"TRANSIMEX","requester":"MS HẠNH","purpose":"GIAO","note":"1PL"},{"from":"13:00","to":"","route":"EIKOU (20 THÙNG)","requester":"MS.VÂN","purpose":"GIAO","note":""},{"from":"14:00","to":"","route":"YUWA","requester":"MS VÂN","purpose":"GIAO","note":"70 thùng A SINH"}],"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"A DƯƠNG OFF","requester":"","purpose":"","note":""}]},"2026-04-29":{"BIG TRUCK 5T 61LD.04922":[{"from":"","to":"","route":"A DƯƠNG OFF","requester":"","purpose":"","note":""}]},"2026-04-30":{}};
 
 const VEH_KEYS = [
-  { key: 'CROSS 61LD.08418',           cls: 'cross' },
-  { key: 'BUS 61LD.02599',             cls: 'bus'   },
-  { key: 'SMALL TRUCK 1.1T 61LD.01001',cls: 'small' },
-  { key: 'BIG TRUCK 5T 61LD.04922',    cls: 'big'   },
-  { key: 'LIMO GREEN 51B-970.37',      cls: 'limo'  },
+  { key: 'CROSS 61LD.08418',           cls: 'cross', color: '#3b82f6', icon: '🚗' },
+  { key: 'BUS 61LD.02599',             cls: 'bus',   color: '#14b8a6', icon: '🚌' },
+  { key: 'SMALL TRUCK 1.1T 61LD.01001',cls: 'small', color: '#f59e0b', icon: '🚚' },
+  { key: 'BIG TRUCK 5T 61LD.04922',    cls: 'big',   color: '#a855f7', icon: '🚛' },
+  { key: 'LIMO GREEN 51B-970.37',      cls: 'limo',  color: '#84cc16', icon: '🚘' },
 ];
+
+const SCHED_CLS = ['cross', 'bus', 'small', 'big', 'limo'];
+const SCHED_COLORS = ['#3b82f6', '#14b8a6', '#f59e0b', '#a855f7', '#84cc16'];
+const SCHED_ICONS = ['🚗', '🚌', '🚚', '🚛', '🚘'];
+
+/** AHHP工場の初期車両（既存工場マスタとは別） */
+const AHHP_VEHICLES = [
+  'INOVA CAR 61LD 022 11',
+  'TRUCK 34LD-01161',
+  'LIMO GREEN',
+];
+
+function getScheduleVehKeys() {
+  if (isDefaultFactory()) return VEH_KEYS;
+  const list = Array.isArray(state.vehicles) ? state.vehicles : [];
+  return list.map((key, i) => ({
+    key,
+    cls: SCHED_CLS[i % SCHED_CLS.length],
+    color: SCHED_COLORS[i % SCHED_COLORS.length],
+    icon: SCHED_ICONS[i % SCHED_ICONS.length],
+  }));
+}
+
+function getExcelDayData(dateKey) {
+  if (!isDefaultFactory()) return {};
+  return EXCEL_SCHEDULE[dateKey] || {};
+}
+
+function formatScheduleHeaderLabel(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  if (parts.length <= 1) return escapeHtmlText(name);
+  const plate = parts[parts.length - 1];
+  const label = parts.slice(0, -1).join(' ');
+  return `${escapeHtmlText(label)}<br>${escapeHtmlText(plate)}`;
+}
+
+function updateScheduleColumns() {
+  const vehs = getScheduleVehKeys();
+  const theadRow = document.getElementById('schedule-thead-row');
+  if (theadRow) {
+    let th = `<th class="col-date" id="th-date">${escapeHtmlText(t('schedColDate'))}</th>`;
+    for (const veh of vehs) {
+      th += `<th class="col-${veh.cls}">${veh.icon || '🚗'} ${formatScheduleHeaderLabel(veh.key)}</th>`;
+    }
+    th += `<th class="col-sys" id="th-sys">${t('schedColSys')}</th>`;
+    theadRow.innerHTML = th;
+  }
+
+  const legend = document.getElementById('schedule-legend');
+  if (legend) {
+    let items = vehs.map(veh =>
+      `<div class="legend-item"><div class="legend-dot" style="background:${veh.color};"></div>${escapeHtmlText(veh.key)}</div>`
+    ).join('');
+    items += `<div class="legend-item"><div class="legend-dot" style="background:#16a34a;"></div><span data-i18n="legendConfirmed">${escapeHtmlText(t('legendConfirmed'))}</span></div>`;
+    items += `<div class="legend-item"><div class="legend-dot" style="background:#f59e0b;border:1px solid #d97706;"></div><span data-i18n="legendPending">${escapeHtmlText(t('legendPending'))}</span></div>`;
+    items += `<div class="legend-item" style="margin-left:auto;"><span style="font-size:11px;color:var(--gray-500);"><span data-i18n="legendToday" style="background:#fef08a;padding:1px 6px;border-radius:3px;">${escapeHtmlText(t('legendToday'))}</span> / <span data-i18n="legendWeekend" style="background:#fee2e2;padding:1px 6px;border-radius:3px;">${escapeHtmlText(t('legendWeekend'))}</span></span></div>`;
+    legend.innerHTML = items;
+  }
+}
 
 const JP_DAYS = ['日','月','火','水','木','金','土'];
 
@@ -1510,11 +1559,12 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
       <span class="day-label" style="${dowColor}">${wdLabel}</span>
     </td>`;
 
-  const dayData  = EXCEL_SCHEDULE[dateKey] || {};
+  const dayData  = getExcelDayData(dateKey);
   const allReqs  = getSysRequestsForDate(dateKey);
   const unmatchedReqs = [];
+  const scheduleVehs = getScheduleVehKeys();
 
-  for (const veh of VEH_KEYS) {
+  for (const veh of scheduleVehs) {
     const excelSlots = dayData[veh.key] || [];
     const matched = allReqs.filter(r => matchVehicleCol(r.vehicle, veh.key));
     if (matched.length > 0) unmatchedReqs.push(...matched.map(r => r.id));
@@ -1581,7 +1631,7 @@ function buildScheduleRowsForDateRange(startIso, endIso, todayStr, opts = {}) {
     const ymKey = `${y}-${mo}`;
     if (includeMonthSep && ymKey !== lastYm) {
       lastYm = ymKey;
-      html += `<tr class="month-sep"><td colspan="${VEH_KEYS.length + 2}">${t('schedMonth', y, mo + 1)}</td></tr>`;
+      html += `<tr class="month-sep"><td colspan="${getScheduleVehKeys().length + 2}">${t('schedMonth', y, mo + 1)}</td></tr>`;
     }
     html += buildScheduleSingleDayRowHtml(y, mo, da, todayStr);
   }
@@ -1593,7 +1643,7 @@ function buildScheduleMonthRowsHtml(year, month, todayStr, opts = {}) {
   const includeMonthSep = opts.includeMonthSep !== false;
   let html = '';
   if (includeMonthSep) {
-    html += `<tr class="month-sep"><td colspan="${VEH_KEYS.length + 2}">${t('schedMonth', year, month + 1)}</td></tr>`;
+    html += `<tr class="month-sep"><td colspan="${getScheduleVehKeys().length + 2}">${t('schedMonth', year, month + 1)}</td></tr>`;
   }
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1785,6 +1835,8 @@ function renderSchedule() {
   const today  = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
+  updateScheduleColumns();
+
   const months = getScheduleDisplayMonths();
 
   let html = '';
@@ -1805,9 +1857,11 @@ function getSysRequestsForDate(dateStr) {
 
 // 車両名がどのExcel列に属するかを判定
 function matchVehicleCol(vehicleName, colKey) {
-  if (!vehicleName) return false;
+  if (!vehicleName || !colKey) return false;
+  if (vehicleName === colKey) return true;
   const v = vehicleName.toUpperCase();
   const c = colKey.toUpperCase();
+  if (v === c) return true;
   // 車両番号の末尾5桁か車種キーワードで照合
   const patterns = {
     'CROSS 61LD.08418':            ['08418', 'CROSS'],
@@ -1815,9 +1869,12 @@ function matchVehicleCol(vehicleName, colKey) {
     'SMALL TRUCK 1.1T 61LD.01001': ['01001', 'SMALL'],
     'BIG TRUCK 5T 61LD.04922':     ['04922', 'BIG TRUCK'],
     'LIMO GREEN 51B-970.37':       ['LIMO GREEN', 'LIMO', '51B', '970.37', '97037'],
+    'INOVA CAR 61LD 022 11':       ['INOVA', '02211', '022 11'],
+    'TRUCK 34LD-01161':            ['34LD', '01161', 'TRUCK'],
+    'LIMO GREEN':                  ['LIMO GREEN', 'LIMO'],
   };
-  const keywords = patterns[colKey] || [];
-  return keywords.some(kw => v.includes(kw));
+  const keywords = patterns[colKey] || c.split(/[\s.\-]+/).filter(t => t.length >= 3);
+  return keywords.some(kw => v.includes(String(kw).toUpperCase()));
 }
 
 // ==================== State ====================
@@ -1911,6 +1968,22 @@ async function loadState() {
         if (!Array.isArray(state.vehicles)) { state.vehicles = []; updated = true; }
         if (!Array.isArray(state.drivers)) { state.drivers = []; updated = true; }
         if (!Array.isArray(state.places)) { state.places = []; updated = true; }
+
+        const companySet = new Set(COMPANY_VEHICLES);
+        const hasCompanyVehicle = state.vehicles.some(v => companySet.has(v));
+        if (factoryLabel === 'AHHP' && (hasCompanyVehicle || state.vehicles.length === 0)) {
+          state.vehicles = [...AHHP_VEHICLES];
+          updated = true;
+        } else if (hasCompanyVehicle) {
+          state.vehicles = state.vehicles.filter(v => !companySet.has(v));
+          updated = true;
+        }
+
+        const companyDrivers = new Set(COMPANY_DRIVERS);
+        if (state.drivers.some(d => companyDrivers.has(d))) {
+          state.drivers = state.drivers.filter(d => !companyDrivers.has(d));
+          updated = true;
+        }
       }
       if (!state.scheduleExcelMemos || typeof state.scheduleExcelMemos !== 'object') {
         state.scheduleExcelMemos = {};
