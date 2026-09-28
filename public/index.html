@@ -1326,7 +1326,6 @@ const EXCEL_SCHEDULE = {"2026-04-01":{"CROSS 61LD.08418":[{"from":"06:00","to":"
 
 const VEH_KEYS = [
   { key: 'CROSS 61LD.08418',           cls: 'cross', color: '#3b82f6', icon: '🚗' },
-  { key: 'BUS 61LD.02599',             cls: 'bus',   color: '#14b8a6', icon: '🚌' },
   { key: 'SMALL TRUCK 1.1T 61LD.01001',cls: 'small', color: '#f59e0b', icon: '🚚' },
   { key: 'BIG TRUCK 5T 61LD.04922',    cls: 'big',   color: '#a855f7', icon: '🚛' },
   { key: 'LIMO GREEN 51B-970.37',      cls: 'limo',  color: '#84cc16', icon: '🚘' },
@@ -1865,7 +1864,6 @@ function matchVehicleCol(vehicleName, colKey) {
   // 車両番号の末尾5桁か車種キーワードで照合
   const patterns = {
     'CROSS 61LD.08418':            ['08418', 'CROSS'],
-    'BUS 61LD.02599':              ['02599', 'BUS'],
     'SMALL TRUCK 1.1T 61LD.01001': ['01001', 'SMALL'],
     'BIG TRUCK 5T 61LD.04922':     ['04922', 'BIG TRUCK'],
     'LIMO GREEN 51B-970.37':       ['LIMO GREEN', 'LIMO', '51B', '970.37', '97037'],
@@ -1924,7 +1922,6 @@ const LIMO_VEHICLE = 'LIMO GREEN 51B-970.37';
 
 const COMPANY_VEHICLES = [
   'CROSS 61LD.08418',
-  'BUS 61LD.02599',
   'SMALL TRUCK 1.1T 61LD.01001',
   'BIG TRUCK 5T 61LD.04922',
   LIMO_VEHICLE,

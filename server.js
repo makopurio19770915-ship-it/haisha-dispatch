@@ -15,6 +15,9 @@ const FACTORY_LABEL = (process.env.FACTORY_LABEL || '').trim();
 
 const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1, scheduleExcelMemos: {} };
 
+/** 廃車済み。マスタへ戻さない（画面の列からも外す） */
+const RETIRED_VEHICLES = new Set(['BUS 61LD.02599']);
+
 const DISCORD_WEBHOOK_URL = (process.env.DISCORD_WEBHOOK_URL || '').trim();
 
 /**
@@ -24,7 +27,9 @@ function normalizeState(input) {
   const merged = { ...INITIAL_STATE, ...(input || {}) };
 
   merged.requests = Array.isArray(merged.requests) ? merged.requests : [];
-  merged.vehicles = Array.isArray(merged.vehicles) ? merged.vehicles : [];
+  merged.vehicles = (Array.isArray(merged.vehicles) ? merged.vehicles : []).filter(
+    (v) => !RETIRED_VEHICLES.has(v)
+  );
   merged.drivers = Array.isArray(merged.drivers) ? merged.drivers : [];
   merged.places = Array.isArray(merged.places) ? merged.places : [];
   merged.scheduleExcelMemos =
@@ -296,12 +301,34 @@ app.post('/api/requests', async (req, res) => {
   }
 });
 
+/** 保存データに廃車車両が残っていれば、起動時にマスタから外して書き戻す */
+async function persistRetiredVehicleRemoval() {
+  if (useMongo) {
+    const doc = await mongoDb.collection('state').findOne({ _id: 'main' });
+    const vehicles = doc?.data?.vehicles || [];
+    if (!vehicles.some((v) => RETIRED_VEHICLES.has(v))) return;
+    await writeState(doc.data || INITIAL_STATE);
+  } else {
+    let raw;
+    try {
+      raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    } catch {
+      return;
+    }
+    const vehicles = raw?.vehicles || [];
+    if (!vehicles.some((v) => RETIRED_VEHICLES.has(v))) return;
+    await writeState(raw);
+  }
+  console.log('  廃車のため車両マスタから外しました: BUS 61LD.02599');
+}
+
 async function start() {
   if (MONGODB_URI) {
     await initMongo();
   } else {
     initFileStorage();
   }
+  await persistRetiredVehicleRemoval();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('\n========================================');
