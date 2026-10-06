@@ -1520,11 +1520,28 @@ function requestIdLinkHtml(id) {
   return `<a href="#request-${n}" class="req-id-link" onclick="event.preventDefault(); event.stopPropagation(); openRequestDetail(${n});">#${n}</a>`;
 }
 
+/** スケジュールカード用。開始時刻と、入っていれば終了時刻（返車予定）を並べる */
+function scheduleClockRange(pickupDt, returnDt) {
+  const start = pickupDt ? String(pickupDt).slice(11, 16) : '';
+  const end = returnDt ? String(returnDt).slice(11, 16) : '';
+  if (!start && !end) return '';
+  if (!end) return start;
+  if (!start) return end;
+  const startDay = String(pickupDt).slice(0, 10);
+  const endDay = String(returnDt).slice(0, 10);
+  if (startDay && endDay && startDay !== endDay) {
+    const parts = endDay.split('-');
+    const md = `${Number(parts[1])}/${Number(parts[2])}`;
+    return `${start} – ${md} ${end}`;
+  }
+  return `${start} – ${end}`;
+}
+
 function buildSysRequestScheduleCardHtml(r, opts = {}) {
   const isPending = r.status === '申請中';
   const cls   = isPending ? 'sys-pend' : 'sys-req';
   const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
-  const hh = r.pickupDt ? r.pickupDt.slice(11, 16) : '';
+  const hh = scheduleClockRange(r.pickupDt, r.returnDt);
   let html = `<div class="sched-entry ${cls}" data-req-id="${r.id}">`;
   html += requestIdBadgeHtml(r.id);
   html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
