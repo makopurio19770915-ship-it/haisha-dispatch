@@ -13,7 +13,18 @@ const MONGODB_DB = (process.env.MONGODB_DB || 'dispatch_app').trim() || 'dispatc
 /** 画面タイトル用の工場ラベル（例: AHHP）。未設定なら表示しない */
 const FACTORY_LABEL = (process.env.FACTORY_LABEL || '').trim();
 
-const INITIAL_STATE = { requests: [], vehicles: [], drivers: [], places: [], nextId: 1, scheduleExcelMemos: {} };
+const INITIAL_STATE = {
+  requests: [],
+  vehicles: [],
+  drivers: [],
+  places: [],
+  nextId: 1,
+  scheduleExcelMemos: {},
+  /** 同じ日・同じ車両のカード表示順。キーは「日付||車両」、値は依頼番号の配列。依頼の中身とは別 */
+  scheduleOrders: {},
+  /** その並び順をいつ保存したか。古い通信が新しい並びを上書きしないために使う */
+  scheduleOrderRev: {},
+};
 
 /** 廃車済み。マスタへ戻さない（画面の列からも外す） */
 const RETIRED_VEHICLES = new Set(['BUS 61LD.02599']);
@@ -36,6 +47,8 @@ function normalizeState(input) {
     merged.scheduleExcelMemos && typeof merged.scheduleExcelMemos === 'object'
       ? merged.scheduleExcelMemos
       : {};
+  merged.scheduleOrders = sanitizeScheduleOrders(merged.scheduleOrders);
+  merged.scheduleOrderRev = sanitizeScheduleOrderRev(merged.scheduleOrderRev);
 
   const usedIds = new Set();
   let maxId = 0;
@@ -70,6 +83,43 @@ function normalizeState(input) {
 
   merged.nextId = Math.max(nextId, maxId + 1);
   return merged;
+}
+
+function sanitizeOrderIds(ids) {
+  if (!Array.isArray(ids)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const id of ids) {
+    const n = Number.parseInt(id, 10);
+    if (!Number.isFinite(n) || n < 1 || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+    if (out.length >= 300) break;
+  }
+  return out;
+}
+
+function sanitizeScheduleOrders(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const key of Object.keys(raw)) {
+    if (typeof key !== 'string' || !key || key.length > 400 || /[\0\n\r]/.test(key)) continue;
+    const ids = sanitizeOrderIds(raw[key]);
+    if (ids.length) out[key] = ids;
+  }
+  return out;
+}
+
+function sanitizeScheduleOrderRev(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const key of Object.keys(raw)) {
+    if (typeof key !== 'string' || !key || key.length > 400 || /[\0\n\r]/.test(key)) continue;
+    const n = Number(raw[key]);
+    if (!Number.isFinite(n) || n < 0) continue;
+    out[key] = n;
+  }
+  return out;
 }
 
 function clipText(s, max) {
@@ -235,6 +285,9 @@ function mergeIncomingState(current, incomingRaw) {
   return normalizeState({
     ...incoming,
     requests: mergedRequests,
+    // 並び順は専用APIだけが書く。依頼の一括保存で消したり、中身を書き換えたりしない
+    scheduleOrders: currentState.scheduleOrders,
+    scheduleOrderRev: currentState.scheduleOrderRev,
     nextId: Math.max(
       Number.parseInt(currentState.nextId, 10) || 1,
       Number.parseInt(incoming.nextId, 10) || 1,
@@ -252,6 +305,44 @@ app.post('/api/state', async (req, res) => {
       await writeState(merged);
     });
     res.json({ ok: true, state: merged });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * 同じ日・同じ車両の表示順だけを保存する。
+ * 依頼の本文・番号・ステータスは触らない。古い並びの通信は無視する。
+ */
+app.post('/api/schedule-order', async (req, res) => {
+  try {
+    const groupKey = String((req.body || {}).groupKey || '');
+    if (!groupKey || groupKey.length > 400 || /[\0\n\r]/.test(groupKey)) {
+      return res.status(400).json({ error: 'bad group' });
+    }
+    const ids = sanitizeOrderIds((req.body || {}).ids);
+    const rev = Number((req.body || {}).rev);
+    if (!Number.isFinite(rev)) return res.status(400).json({ error: 'bad rev' });
+
+    let saved = null;
+    await enqueueMutation(async () => {
+      const s = await readState();
+      const currentRev = Number(s.scheduleOrderRev[groupKey]) || 0;
+      if (rev < currentRev) {
+        saved = s;
+        return;
+      }
+      if (ids.length) s.scheduleOrders[groupKey] = ids;
+      else delete s.scheduleOrders[groupKey];
+      s.scheduleOrderRev[groupKey] = rev;
+      await writeState(s);
+      saved = await readState();
+    });
+    res.json({
+      ok: true,
+      scheduleOrders: saved.scheduleOrders,
+      scheduleOrderRev: saved.scheduleOrderRev,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

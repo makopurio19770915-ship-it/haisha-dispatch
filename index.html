@@ -85,6 +85,43 @@
     .sched-entry.empty-cell { color: var(--gray-300); font-size: 11px; text-align: center; padding: 4px; }
     .sched-entry.sys-req  { background: #f0fdf4; border-left: 3px solid #16a34a; }
     .sched-entry.sys-pend { background: #fffbeb; border-left: 3px solid #f59e0b; }
+    .sched-entry.is-sortable { position: relative; padding-left: 20px; }
+    .sched-drag-handle {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: none;
+      color: #9ca3af;
+      font-size: 13px;
+      line-height: 1;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      z-index: 2;
+    }
+    .sched-drag-handle:active { cursor: grabbing; }
+    .sched-drop-gap {
+      border-radius: 5px;
+      margin-bottom: 5px;
+      background: rgba(22, 163, 74, 0.22);
+      box-sizing: border-box;
+    }
+    .sched-entry.is-float {
+      position: fixed;
+      z-index: 80;
+      margin: 0;
+      pointer-events: none;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+    }
+    body.is-schedule-dragging { user-select: none; cursor: grabbing; }
+    .schedule-pdf-export .sched-drag-handle { display: none; }
+    .schedule-pdf-export .sched-entry.is-sortable { padding-left: 7px; }
 
     .sched-memo-wrap {
       margin-top: 8px;
@@ -1055,6 +1092,8 @@ const LANGS = {
     badgeDone: '✅ 完了',
     schedMemoLabel: 'スケジュール備考',
     schedMemoPh: '追記（全員共有・保存されます）',
+    dragHandle: '順番を入れ替え',
+    toastOrderSaveError: '並び順を保存できませんでした',
 
     // Assign modal
     assignTitle: '車両・ドライバーを割り当てる',
@@ -1210,6 +1249,8 @@ const LANGS = {
     badgeDone: '✅ Hoàn thành',
     schedMemoLabel: 'Ghi chú lịch',
     schedMemoPh: 'Thêm ghi chú (lưu chung)',
+    dragHandle: 'Kéo để sắp xếp',
+    toastOrderSaveError: 'Không lưu được thứ tự',
 
     assignTitle: 'Phân công xe và tài xế',
     assignVehicle: 'Chọn xe',
@@ -1542,7 +1583,11 @@ function buildSysRequestScheduleCardHtml(r, opts = {}) {
   const cls   = isPending ? 'sys-pend' : 'sys-req';
   const badge = isPending ? t('badgePending') : (r.status === '完了' ? t('badgeDone') : t('badgeConfirmed'));
   const hh = scheduleClockRange(r.pickupDt, r.returnDt);
-  let html = `<div class="sched-entry ${cls}" data-req-id="${r.id}">`;
+  const sortable = !!opts.sortable;
+  let html = `<div class="sched-entry ${cls}${sortable ? ' is-sortable' : ''}" data-req-id="${r.id}">`;
+  if (sortable) {
+    html += `<div class="sched-drag-handle" role="button" aria-label="${escapeHtmlAttr(t('dragHandle'))}" title="${escapeHtmlAttr(t('dragHandle'))}">≡</div>`;
+  }
   html += requestIdBadgeHtml(r.id);
   html += `<div class="entry-time">${badge}${hh ? ' ⏰ ' + hh : ''}</div>`;
   html += `<div class="entry-route">${escapeHtmlText(r.from)} → ${escapeHtmlText(r.to)}</div>`;
@@ -1566,6 +1611,24 @@ function compareScheduleRequests(a, b) {
   if (!ta) return 1;
   if (!tb) return -1;
   return ta < tb ? -1 : 1;
+}
+
+/** 並び順の保存キー。日付と車両を組にしたもので、依頼番号とは別 */
+function scheduleGroupKey(dateKey, vehicleKey) {
+  return `${dateKey}||${vehicleKey || '__unassigned__'}`;
+}
+
+/** 保存済みの表示順があればそれを優先し、未登録のカードは開始時刻順でうしろに付ける */
+function sortScheduleCards(reqs, groupKey) {
+  const ids = state.scheduleOrders && state.scheduleOrders[groupKey];
+  const rank = new Map();
+  if (Array.isArray(ids)) ids.forEach((id, i) => rank.set(Number(id), i));
+  return reqs.slice().sort((a, b) => {
+    const ra = rank.has(Number(a.id)) ? rank.get(Number(a.id)) : Number.MAX_SAFE_INTEGER;
+    const rb = rank.has(Number(b.id)) ? rank.get(Number(b.id)) : Number.MAX_SAFE_INTEGER;
+    if (ra !== rb) return ra - rb;
+    return compareScheduleRequests(a, b);
+  });
 }
 
 /** 1日分の <tr> のみ */
@@ -1592,7 +1655,11 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
 
   for (const veh of scheduleVehs) {
     const excelSlots = dayData[veh.key] || [];
-    const matched = allReqs.filter(r => matchVehicleCol(r.vehicle, veh.key)).sort(compareScheduleRequests);
+    const groupKey = scheduleGroupKey(dateKey, veh.key);
+    const matched = sortScheduleCards(
+      allReqs.filter(r => matchVehicleCol(r.vehicle, veh.key)),
+      groupKey
+    );
     if (matched.length > 0) unmatchedReqs.push(...matched.map(r => r.id));
 
     html += `<td>`;
@@ -1612,8 +1679,11 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
       hasCells = true;
     }
 
-    for (const r of matched) {
-      html += buildSysRequestScheduleCardHtml(r);
+    if (matched.length) {
+      const sortable = matched.length > 1;
+      html += `<div class="sched-sort-list" data-sort-group="${escapeHtmlAttr(groupKey)}">`;
+      for (const r of matched) html += buildSysRequestScheduleCardHtml(r, { sortable });
+      html += `</div>`;
       hasCells = true;
     }
 
@@ -1621,14 +1691,21 @@ function buildScheduleSingleDayRowHtml(year, month, day, todayStr) {
     html += `</td>`;
   }
 
-  const unmatched = allReqs.filter(r => !unmatchedReqs.includes(r.id)).sort(compareScheduleRequests);
+  const unmatchedKey = scheduleGroupKey(dateKey, '__unassigned__');
+  const unmatched = sortScheduleCards(
+    allReqs.filter(r => !unmatchedReqs.includes(r.id)),
+    unmatchedKey
+  );
   html += `<td>`;
   if (unmatched.length === 0) {
     html += `<div class="sched-entry empty-cell">—</div>`;
   } else {
+    const sortable = unmatched.length > 1;
+    html += `<div class="sched-sort-list" data-sort-group="${escapeHtmlAttr(unmatchedKey)}">`;
     for (const r of unmatched) {
-      html += buildSysRequestScheduleCardHtml(r, { showVehicle: true });
+      html += buildSysRequestScheduleCardHtml(r, { showVehicle: true, sortable });
     }
+    html += `</div>`;
   }
   html += `</td>`;
 
@@ -1856,7 +1933,222 @@ function updateScheduleTitle() {
   el.textContent = t('schedPanelTitle', label);
 }
 
+let scheduleDrag = null;
+let scheduleDragMoveRaf = 0;
+let scheduleOrderSeq = 0;
+
+function sameIdList(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (Number(a[i]) !== Number(b[i])) return false;
+  return true;
+}
+
+function listCardIds(list) {
+  return [...list.querySelectorAll(':scope > .sched-entry[data-req-id]')].map((el) => Number(el.dataset.reqId));
+}
+
+function clearCardDragStyle(card) {
+  card.classList.remove('is-float');
+  card.style.left = '';
+  card.style.width = '';
+  card.style.top = '';
+  card.style.transform = '';
+  card.style.transition = '';
+}
+
+/** 描画し直す直前に、途中のドラッグを捨てる。保存はしない */
+function abortScheduleDrag() {
+  const d = scheduleDrag;
+  if (!d) return;
+  scheduleDrag = null;
+  if (scheduleDragMoveRaf) {
+    cancelAnimationFrame(scheduleDragMoveRaf);
+    scheduleDragMoveRaf = 0;
+  }
+  document.body.classList.remove('is-schedule-dragging');
+  if (d.placeholder && d.placeholder.parentNode) d.placeholder.remove();
+  if (d.card) clearCardDragStyle(d.card);
+  if (d.active && d.list && d.beforeNodes) {
+    for (const node of d.beforeNodes) {
+      if (node && d.list.isConnected) d.list.appendChild(node);
+    }
+  }
+}
+
+function beginScheduleDrag(d, e) {
+  const card = d.card;
+  const list = d.list;
+  const rect = card.getBoundingClientRect();
+  d.active = true;
+  d.offsetY = e.clientY - rect.top;
+  d.beforeNodes = [...list.querySelectorAll(':scope > .sched-entry[data-req-id]')];
+  d.beforeIds = d.beforeNodes.map((el) => Number(el.dataset.reqId));
+  const saved = state.scheduleOrders && state.scheduleOrders[d.groupKey];
+  d.hadSaved = Array.isArray(saved) && saved.length > 0;
+  d.beforeRev = (state.scheduleOrderRev && Number(state.scheduleOrderRev[d.groupKey])) || 0;
+  const ph = document.createElement('div');
+  ph.className = 'sched-drop-gap';
+  ph.style.height = `${rect.height}px`;
+  card.before(ph);
+  d.placeholder = ph;
+  document.body.appendChild(card);
+  card.classList.add('is-float');
+  card.style.left = `${rect.left}px`;
+  card.style.width = `${rect.width}px`;
+  card.style.top = '0px';
+  card.style.transform = `translate3d(0,${rect.top}px,0)`;
+  document.body.classList.add('is-schedule-dragging');
+}
+
+function moveScheduleDrag(d) {
+  const y = d.y - d.offsetY;
+  d.card.style.transform = `translate3d(0,${y}px,0)`;
+  const list = d.list;
+  const cards = [...list.querySelectorAll(':scope > .sched-entry[data-req-id]')];
+  let target = null;
+  for (const sib of cards) {
+    const r = sib.getBoundingClientRect();
+    if (d.y < r.top + r.height / 2) {
+      target = sib;
+      break;
+    }
+  }
+  const ph = d.placeholder;
+  if (target) {
+    if (ph.nextElementSibling === target) return;
+    target.before(ph);
+    return;
+  }
+  if (list.lastElementChild !== ph) list.appendChild(ph);
+}
+
+function finishScheduleDrag(d) {
+  const list = d.list;
+  const card = d.card;
+  if (d.placeholder && d.placeholder.parentNode) d.placeholder.replaceWith(card);
+  else list.appendChild(card);
+  clearCardDragStyle(card);
+  document.body.classList.remove('is-schedule-dragging');
+  for (const el of list.querySelectorAll(':scope > .sched-entry')) {
+    el.style.transform = '';
+    el.style.transition = '';
+  }
+  const ids = listCardIds(list);
+  if (sameIdList(ids, d.beforeIds)) return;
+  saveScheduleOrder(d);
+}
+
+function restoreScheduleNodes(list, nodes) {
+  if (!list || !list.isConnected) return;
+  for (const node of nodes) {
+    if (node) list.appendChild(node);
+  }
+}
+
+/** 画面は先に確定し、保存は裏で行う。失敗したらこの操作の直前へ戻す */
+function saveScheduleOrder(d) {
+  const groupKey = d.groupKey;
+  const list = d.list;
+  const ids = listCardIds(list);
+  if (!state.scheduleOrders || typeof state.scheduleOrders !== 'object') state.scheduleOrders = {};
+  if (!state.scheduleOrderRev || typeof state.scheduleOrderRev !== 'object') state.scheduleOrderRev = {};
+  scheduleOrderSeq += 1;
+  const rev = Date.now() * 1000 + (scheduleOrderSeq % 1000);
+  const gen = rev;
+  d.saveGen = gen;
+  state.scheduleOrders[groupKey] = ids.slice();
+  state.scheduleOrderRev[groupKey] = rev;
+  if (!saveScheduleOrder.latest) saveScheduleOrder.latest = {};
+  saveScheduleOrder.latest[groupKey] = gen;
+
+  fetch('/api/schedule-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ groupKey, ids, rev }),
+  }).then(async (res) => {
+    if (saveScheduleOrder.latest[groupKey] !== gen) return;
+    if (!res.ok) throw new Error('save');
+    const data = await res.json().catch(() => null);
+    if (saveScheduleOrder.latest[groupKey] !== gen || !data) return;
+    const localOrders = state.scheduleOrders || {};
+    const localRevs = state.scheduleOrderRev || {};
+    state.scheduleOrders = data.scheduleOrders || {};
+    state.scheduleOrderRev = data.scheduleOrderRev || {};
+    for (const key of Object.keys(localRevs)) {
+      const localRev = Number(localRevs[key]) || 0;
+      const serverRev = Number(state.scheduleOrderRev[key]) || 0;
+      if (localRev > serverRev) {
+        state.scheduleOrderRev[key] = localRev;
+        state.scheduleOrders[key] = localOrders[key];
+      }
+    }
+  }).catch(() => {
+    if (saveScheduleOrder.latest[groupKey] !== gen) return;
+    if (d.hadSaved) state.scheduleOrders[groupKey] = d.beforeIds.slice();
+    else delete state.scheduleOrders[groupKey];
+    state.scheduleOrderRev[groupKey] = d.beforeRev;
+    restoreScheduleNodes(list, d.beforeNodes);
+    toast(t('toastOrderSaveError'), 'error');
+  });
+}
+
+function onSchedulePointerDown(e) {
+  if (scheduleDrag) return;
+  if (e.button != null && e.button !== 0) return;
+  const handle = e.target.closest && e.target.closest('.sched-drag-handle');
+  if (!handle) return;
+  const card = handle.closest('.sched-entry[data-req-id]');
+  const list = card && card.closest('.sched-sort-list');
+  if (!card || !list) return;
+  e.preventDefault();
+  e.stopPropagation();
+  try { if (handle.setPointerCapture) handle.setPointerCapture(e.pointerId); } catch (err) { /* テスト用イベントでは取れないことがある */ }
+  scheduleDrag = {
+    pointerId: e.pointerId,
+    card,
+    list,
+    groupKey: list.dataset.sortGroup || '',
+    startY: e.clientY,
+    y: e.clientY,
+    active: false,
+  };
+}
+
+function onSchedulePointerMove(e) {
+  const d = scheduleDrag;
+  if (!d || e.pointerId !== d.pointerId) return;
+  d.y = e.clientY;
+  if (!d.active) {
+    if (Math.abs(e.clientY - d.startY) < 4) return;
+    beginScheduleDrag(d, e);
+  }
+  if (scheduleDragMoveRaf) return;
+  scheduleDragMoveRaf = requestAnimationFrame(() => {
+    scheduleDragMoveRaf = 0;
+    if (scheduleDrag && scheduleDrag.active) moveScheduleDrag(scheduleDrag);
+  });
+}
+
+function onSchedulePointerUp(e) {
+  const d = scheduleDrag;
+  if (!d || e.pointerId !== d.pointerId) return;
+  if (scheduleDragMoveRaf) {
+    cancelAnimationFrame(scheduleDragMoveRaf);
+    scheduleDragMoveRaf = 0;
+    if (d.active) moveScheduleDrag(d);
+  }
+  scheduleDrag = null;
+  if (!d.active) return;
+  finishScheduleDrag(d);
+}
+
+document.addEventListener('pointerdown', onSchedulePointerDown);
+document.addEventListener('pointermove', onSchedulePointerMove);
+document.addEventListener('pointerup', onSchedulePointerUp);
+document.addEventListener('pointercancel', onSchedulePointerUp);
+
 function renderSchedule() {
+  abortScheduleDrag();
   const tbody  = document.getElementById('schedule-tbody');
   const today  = new Date();
   const todayStr = today.toISOString().slice(0, 10);
@@ -1910,6 +2202,8 @@ let state = {
   places: [],
   nextId: 1,
   scheduleExcelMemos: {},
+  scheduleOrders: {},
+  scheduleOrderRev: {},
 };
 
 let assignTargetId = null;
@@ -1933,7 +2227,7 @@ async function saveState() {
   if (res.ok) {
     const data = await res.json().catch(() => null);
     if (data && data.state && Array.isArray(data.state.requests)) {
-      state = data.state;
+      adoptServerState(data.state);
     }
   }
   if (document.getElementById('panel-schedule').classList.contains('active')) {
@@ -1942,6 +2236,23 @@ async function saveState() {
   updatePendingCount();
   if (document.getElementById('panel-manage').classList.contains('active')) {
     renderRequests();
+  }
+}
+
+/** 依頼の保存結果を取り込みつつ、まだサーバーへ届いていない並び順は残す */
+function adoptServerState(next) {
+  const localOrders = state.scheduleOrders || {};
+  const localRevs = state.scheduleOrderRev || {};
+  state = next;
+  if (!state.scheduleOrders || typeof state.scheduleOrders !== 'object') state.scheduleOrders = {};
+  if (!state.scheduleOrderRev || typeof state.scheduleOrderRev !== 'object') state.scheduleOrderRev = {};
+  for (const key of Object.keys(localRevs)) {
+    const localRev = Number(localRevs[key]) || 0;
+    const serverRev = Number(state.scheduleOrderRev[key]) || 0;
+    if (localRev > serverRev) {
+      state.scheduleOrderRev[key] = localRev;
+      state.scheduleOrders[key] = Array.isArray(localOrders[key]) ? localOrders[key] : [];
+    }
   }
 }
 
@@ -1968,6 +2279,8 @@ async function loadState() {
     const saved = await res.json();
     if (saved && saved.requests) {
       state = saved;
+      if (!state.scheduleOrders || typeof state.scheduleOrders !== 'object') state.scheduleOrders = {};
+      if (!state.scheduleOrderRev || typeof state.scheduleOrderRev !== 'object') state.scheduleOrderRev = {};
       let updated = false;
       if (isDefaultFactory()) {
         for (const v of COMPANY_VEHICLES) {
