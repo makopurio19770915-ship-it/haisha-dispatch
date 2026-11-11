@@ -34,9 +34,15 @@
       font-size: 13px;
       min-width: 1160px;
     }
+    .schedule-pdf-export .schedule-table th,
+    .schedule-pdf-export .schedule-table td.td-date {
+      position: static !important;
+      box-shadow: none;
+    }
     .schedule-pdf-export .entry-route { font-size: 13px; }
     .schedule-pdf-export .entry-meta { font-size: 11px; }
     .schedule-pdf-export .entry-time { font-size: 11px; }
+    .schedule-pdf-export .sched-memo-input { min-height: 28px; }
     .schedule-table th {
       background: var(--primary);
       color: white;
@@ -1801,7 +1807,7 @@ function initPdfExportDateInputs() {
 }
 
 /** 縦A4に幅いっぱい、高さは複数ページに分割（文字を小さくしない） */
-function addCanvasAsPortraitPages(pdf, canvas, marginMm) {
+function addCanvasAsPortraitPages(pdf, canvas, marginMm, opts = {}) {
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
   const contentW = pageW - 2 * marginMm;
@@ -1809,14 +1815,16 @@ function addCanvasAsPortraitPages(pdf, canvas, marginMm) {
   const totalHmm = (canvas.height / canvas.width) * contentW;
   if (!isFinite(totalHmm) || totalHmm <= 0) return;
 
+  let needNewPage = !!opts.startNewPage;
+
   if (totalHmm <= contentH) {
+    if (needNewPage) pdf.addPage();
     const imgData = canvas.toDataURL('image/png');
     pdf.addImage(imgData, 'PNG', marginMm, marginMm, contentW, totalHmm);
     return;
   }
 
   const stripePx = Math.max(8, Math.ceil((canvas.width * contentH) / contentW));
-  let page = 0;
   for (let y0 = 0; y0 < canvas.height; y0 += stripePx) {
     const h = Math.min(stripePx, canvas.height - y0);
     const strip = document.createElement('canvas');
@@ -1826,8 +1834,72 @@ function addCanvasAsPortraitPages(pdf, canvas, marginMm) {
     ctx.drawImage(canvas, 0, y0, canvas.width, h, 0, 0, canvas.width, h);
     const url = strip.toDataURL('image/png');
     const drawHmm = (h / canvas.height) * totalHmm;
-    if (page++ > 0) pdf.addPage();
+    if (needNewPage) pdf.addPage();
     pdf.addImage(url, 'PNG', marginMm, marginMm, contentW, drawHmm);
+    needNewPage = true;
+  }
+}
+
+/** PDF用に日付範囲を短い塊へ分ける（大きすぎる画像で端末が落ちるのを防ぐ） */
+function splitIsoDateRange(fromIso, toIso, maxDays) {
+  const parse = s => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  let cur = parse(fromIso);
+  const end = parse(toIso);
+  const chunks = [];
+  while (cur.getTime() <= end.getTime()) {
+    const start = new Date(cur);
+    const stop = new Date(cur);
+    stop.setDate(stop.getDate() + maxDays - 1);
+    if (stop > end) stop.setTime(end.getTime());
+    chunks.push([yyyyMmDd(start), yyyyMmDd(stop)]);
+    cur = new Date(stop);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return chunks;
+}
+
+/** 画面外に表を組み立てて画像化する。失敗時は倍率を下げて再試行 */
+async function captureSchedulePdfCanvas(theadHtml, fromIso, toIso, todayStr, titleHtml) {
+  const host = document.createElement('div');
+  host.className = 'schedule-pdf-export';
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1380px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
+  host.innerHTML = `
+    ${titleHtml || ''}
+    <div class="schedule-wrap">
+      <table class="schedule-table">
+        <thead>${theadHtml}</thead>
+        <tbody>${buildScheduleRowsForDateRange(fromIso, toIso, todayStr, { includeMonthSep: true })}</tbody>
+      </table>
+    </div>`;
+  document.body.appendChild(host);
+
+  try {
+    await document.fonts.ready;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const wrap = host.querySelector('.schedule-wrap');
+    // 端末のキャンバス上限（約16384px）を超えないよう倍率を抑える
+    const maxEdge = 8000;
+    let scale = 2;
+    if (wrap.scrollHeight * scale > maxEdge) {
+      scale = Math.max(1, maxEdge / Math.max(wrap.scrollHeight, 1));
+    }
+    const canvas = await html2canvas(wrap, {
+      scale,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowWidth: host.scrollWidth,
+      scrollX: 0,
+      scrollY: 0,
+    });
+    if (!canvas.width || !canvas.height) throw new Error('empty canvas');
+    return canvas;
+  } finally {
+    host.remove();
   }
 }
 
@@ -1874,42 +1946,29 @@ async function exportSchedulePdfFromInputs() {
     monthHeading = `${monthLabels[0]} … ${monthLabels[monthLabels.length - 1]} (${monthLabels.length}${t('pdfMonthsCount')})`;
   }
   const dateSpanLine = t('pdfTitleRange', fromIso, toIso);
-
-  const host = document.createElement('div');
-  host.id = 'pdf-schedule-export-host';
-  host.className = 'schedule-pdf-export';
-  host.setAttribute('aria-hidden', 'true');
-  host.style.cssText = 'position:fixed;left:-12000px;top:0;width:1380px;max-width:none;background:#fff;padding:20px 24px;box-sizing:border-box;';
-
-  host.innerHTML = `
+  const titleHtml = `
     <div style="margin-bottom:14px;">
       <div style="font-size:18px;font-weight:700;color:#111827;line-height:1.35;">${monthHeading}</div>
       <div style="font-size:13px;color:#374151;margin-top:6px;font-weight:600;">${dateSpanLine}</div>
-    </div>
-    <div class="schedule-wrap" id="pdf-schedule-wrap">
-      <table class="schedule-table">
-        <thead>${theadEl.innerHTML}</thead>
-        <tbody>${buildScheduleRowsForDateRange(fromIso, toIso, todayStr, { includeMonthSep: true })}</tbody>
-      </table>
     </div>`;
-  document.body.appendChild(host);
+  const theadHtml = theadEl.innerHTML;
+  const chunks = splitIsoDateRange(fromIso, toIso, 5);
 
   try {
-    await document.fonts.ready;
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-    const wrap = host.querySelector('#pdf-schedule-wrap');
-    const canvas = await html2canvas(wrap, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      windowWidth: host.scrollWidth,
-    });
-
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    addCanvasAsPortraitPages(pdf, canvas, 10);
+
+    for (let i = 0; i < chunks.length; i++) {
+      const [chunkFrom, chunkTo] = chunks[i];
+      const canvas = await captureSchedulePdfCanvas(
+        theadHtml,
+        chunkFrom,
+        chunkTo,
+        todayStr,
+        i === 0 ? titleHtml : ''
+      );
+      addCanvasAsPortraitPages(pdf, canvas, 10, { startNewPage: i > 0 });
+    }
 
     const fname = `schedule_${fromIso}_${toIso}.pdf`;
     pdf.save(fname);
@@ -1917,8 +1976,6 @@ async function exportSchedulePdfFromInputs() {
   } catch (e) {
     console.error(e);
     toast(t('toastPdfError'), 'error');
-  } finally {
-    host.remove();
   }
 }
 
