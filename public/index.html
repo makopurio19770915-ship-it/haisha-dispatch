@@ -6,19 +6,30 @@
   <title>配車管理システム</title>
   <style>
     /* ===== Schedule Tab ===== */
+    /* 表の中だけ縦横スクロールし、車名・日付の見出しを固定する */
     .schedule-wrap {
-      overflow-x: auto;
+      overflow: auto;
+      max-height: calc(100dvh - 280px);
+      min-height: 280px;
       border-radius: var(--radius);
       box-shadow: var(--shadow);
+      -webkit-overflow-scrolling: touch;
+      background: white;
     }
     .schedule-table {
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
       width: 100%;
       min-width: 1080px;
       background: white;
       font-size: 12px;
     }
     /* PDFキャプチャ用（画面外にも適用できるようクラス名で指定） */
+    .schedule-pdf-export .schedule-wrap {
+      max-height: none;
+      min-height: 0;
+      overflow: visible;
+    }
     .schedule-pdf-export .schedule-table {
       font-size: 13px;
       min-width: 1160px;
@@ -37,8 +48,14 @@
       position: sticky;
       top: 0;
       z-index: 10;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
     }
-    .schedule-table th.col-date { min-width: 80px; }
+    .schedule-table th.col-date {
+      min-width: 80px;
+      left: 0;
+      z-index: 12;
+      background: var(--primary);
+    }
     .schedule-table th.col-cross { background: #1d4ed8; }
     .schedule-table th.col-bus   { background: #0f766e; }
     .schedule-table th.col-small { background: #92400e; }
@@ -52,6 +69,7 @@
       border: 1px solid var(--gray-200);
       vertical-align: top;
       min-width: 180px;
+      background: #fff;
     }
     .schedule-table td.td-date {
       background: var(--gray-50);
@@ -272,6 +290,9 @@
       gap: 12px;
       height: 56px;
       box-shadow: var(--shadow-md);
+      position: sticky;
+      top: 0;
+      z-index: 40;
     }
     .app-header .logo { font-size: 20px; }
     .app-header h1 { font-size: 17px; font-weight: 600; letter-spacing: 0.02em; }
@@ -283,6 +304,9 @@
       padding: 0 24px;
       display: flex;
       gap: 4px;
+      position: sticky;
+      top: 56px;
+      z-index: 39;
     }
     .tab-btn {
       padding: 14px 20px;
@@ -527,6 +551,7 @@
       .detail-grid { grid-template-columns: 1fr; gap: 4px; }
       .detail-actions .btn { min-height: 40px; }
       .schedule-table td { min-width: 150px; }
+      .schedule-wrap { max-height: calc(100dvh - 320px); }
     }
 
     /* ===== Quick Place Selector ===== */
@@ -816,7 +841,7 @@
 </main>
 
   <!-- ========== 月間スケジュール ========== -->
-  <div class="tab-panel" id="panel-schedule">
+  <div class="tab-panel" id="panel-schedule" style="padding:20px; max-width:100%; box-sizing:border-box;">
     <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 24px; margin-bottom:20px;">
       <div class="sched-month-nav" style="display:flex;flex-direction:column;align-items:stretch;gap:12px;">
         <h2 id="sched-month-title" style="margin:0;"></h2>
