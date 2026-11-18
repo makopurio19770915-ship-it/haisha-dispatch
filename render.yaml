@@ -13,3 +13,5 @@ services:
       #   MONGODB_URI … MongoDB Atlas の接続文字列（必須）
       #   MONGODB_DB  … 工場ごとのDB名（未設定時は dispatch_app）
       #   FACTORY_LABEL … 画面タイトル用（例: AHHP。未設定なら表示なし）
+      #   DISPATCHER_PIN … 時間変更用の配車担当者パスワード
+      #   DISCORD_WEBHOOK_URL … 新規依頼・時間変更の通知先

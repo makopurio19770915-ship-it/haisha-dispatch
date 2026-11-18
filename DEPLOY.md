@@ -62,9 +62,31 @@ data/
 5. **Environment** に変数を追加:
   - **Key**: `MONGODB_URI`  
   - **Value**: 手順1でコピーした URI（パスワード反映済み）
+  - （推奨）**Key**: `DISPATCHER_PIN`  
+  - **Value**: 配車担当者だけが知る共通パスワード（時間変更用）
 6. **Create Web Service** でデプロイ
 
 完了後、Render が表示する URL（例: `https://dispatch-manager-xxxx.onrender.com`）をスタッフに共有します。
+
+---
+
+## 3a. 時間変更機能（配車担当者用）
+
+配車担当者は、依頼詳細の「時間変更」から迎え・帰着日時だけを直せます。申請者の再申請は不要です。
+
+必要な環境変数:
+
+| Key | 意味 |
+| --- | --- |
+| `DISPATCHER_PIN` | 時間変更時に入力する共通パスワード。未設定だと「時間変更」ボタンは出ません |
+| `DISCORD_WEBHOOK_URL` | 時間変更のお知らせを送るチャンネル（新規依頼通知と同じで可） |
+| `FACTORY_LABEL` | ある場合は通知に工場名として表示（無い場合は AHVN） |
+
+Render での追加手順:
+
+1. 対象サービス（`haisha-dispatch` または `haisha-dispatch-ahhp`）を開く
+2. 左メニュー **Environment** → **Edit**
+3. `DISPATCHER_PIN` を追加して保存（再デプロイされます）
 
 ---
 
@@ -89,6 +111,7 @@ data/
 | `MONGODB_URI` | 既存と同じ Atlas 接続文字列で可 | データの保管庫への接続先 |
 | `MONGODB_DB` | `dispatch_app_ahhp` | **工場専用のDB名**（既存の `dispatch_app` と別にする） |
 | `FACTORY_LABEL` | `AHHP` | 画面タイトルに「（AHHP）」と表示 |
+| `DISPATCHER_PIN` | 担当者用パスワード | 時間変更の権限確認 |
 
 6. **Create Web Service** でデプロイ
 
@@ -111,9 +134,9 @@ data/
 
 ## 5. セキュティについて
 
-現状、アプリにログイン機能はあります。**URL を知っている人は誰でも開けます。**  
-社外に URL を広めない・推測されにくい URL のみ共有する運用を推奨します。  
-ログインや Basic 認証が必要になった場合は別途対応可能です。
+現状、アプリ全体のログインはありません。**URL を知っている人は誰でも開けます。**  
+時間変更だけは `DISPATCHER_PIN` で配車担当者に限定しています。  
+社外に URL を広めない・推測されにくい URL のみ共有する運用を推奨します。
 
 ---
 

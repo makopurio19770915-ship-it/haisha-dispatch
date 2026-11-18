@@ -1006,6 +1006,46 @@
   </div>
 </div>
 
+<!-- ========== 時間変更モーダル ========== -->
+<div class="modal-overlay hidden" id="time-change-modal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h2 data-i18n="timeChangeTitle">配車時間を変更</h2>
+      <button class="modal-close" onclick="closeTimeChangeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-info" id="time-change-summary" style="margin-bottom:12px;font-size:13px;color:var(--gray-600);"></p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label data-i18n="labelPickup">乗車日時</label>
+          <input type="datetime-local" id="tc-pickup-dt" oninput="updateTimeChangePreview()" />
+        </div>
+        <div class="form-group">
+          <label data-i18n="labelReturn">返車予定日時</label>
+          <input type="datetime-local" id="tc-return-dt" oninput="updateTimeChangePreview()" />
+        </div>
+        <div class="form-group full">
+          <label data-i18n="timeChangeReason">変更理由</label>
+          <textarea id="tc-reason" rows="2" data-i18n-ph="timeChangeReasonPh" placeholder="例：車両スケジュール調整"></textarea>
+        </div>
+        <div class="form-group">
+          <label data-i18n="timeChangeBy">変更担当者</label>
+          <input type="text" id="tc-changed-by" data-i18n-ph="timeChangeByPh" placeholder="例：THAO" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label data-i18n="timeChangePin">担当者パスワード</label>
+          <input type="password" id="tc-pin" data-i18n-ph="timeChangePinPh" placeholder="配車担当者用パスワード" autocomplete="current-password" />
+        </div>
+      </div>
+      <div id="time-change-preview" style="margin-top:14px;padding:12px;background:var(--gray-50,#f9fafb);border-radius:8px;font-size:13px;line-height:1.6;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeTimeChangeModal()" data-i18n="btnModalCancel">キャンセル</button>
+      <button class="btn btn-success" id="tc-save-btn" onclick="confirmTimeChange()" data-i18n="btnSaveTimeChange">変更を保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1080,6 +1120,27 @@ const LANGS = {
     btnSaveEditCompleted: '保存する',
     toastEditCompletedSaved: '完了案件を更新しました',
     toastEnterRoute: '出発地と目的地を入力してください',
+    btnTimeChange: '時間変更',
+    timeChangeTitle: '配車時間を変更',
+    timeChangeReason: '変更理由',
+    timeChangeReasonPh: '例：車両スケジュール調整',
+    timeChangeBy: '変更担当者',
+    timeChangeByPh: '例：THAO',
+    timeChangePin: '担当者パスワード',
+    timeChangePinPh: '配車担当者用パスワード',
+    timeChangeBefore: '変更前',
+    timeChangeAfter: '変更後',
+    timeChangeHistory: '時間変更履歴',
+    timeChangeNoHistory: '変更履歴はまだありません',
+    timeChangeDiscordSent: 'Discord通知済み',
+    timeChangeDiscordFailed: 'Discord通知失敗',
+    btnResendDiscord: '再送',
+    btnSaveTimeChange: '変更を保存',
+    toastTimeChangeSaved: '時間を変更しました',
+    toastTimeChangeDiscordFail: '時間は保存しましたが、Discord通知に失敗しました',
+    toastTimeChangeNeedPin: 'パスワードと担当者名・理由を入力してください',
+    toastResendOk: 'Discordへ再送しました',
+    toastResendFail: '再送に失敗しました',
     emptyRequests: '依頼はまだありません',
     emptyFiltered: '該当する依頼はありません',
 
@@ -1239,6 +1300,27 @@ const LANGS = {
     btnSaveEditCompleted: 'Lưu',
     toastEditCompletedSaved: 'Đã cập nhật yêu cầu',
     toastEnterRoute: 'Nhập điểm xuất phát và điểm đến',
+    btnTimeChange: 'Đổi giờ',
+    timeChangeTitle: 'Đổi thời gian xe',
+    timeChangeReason: 'Lý do thay đổi',
+    timeChangeReasonPh: 'VD: Điều chỉnh lịch xe',
+    timeChangeBy: 'Người thay đổi',
+    timeChangeByPh: 'VD: THAO',
+    timeChangePin: 'Mật khẩu điều phối',
+    timeChangePinPh: 'Mật khẩu dành cho điều phối',
+    timeChangeBefore: 'Trước khi đổi',
+    timeChangeAfter: 'Sau khi đổi',
+    timeChangeHistory: 'Lịch sử đổi giờ',
+    timeChangeNoHistory: 'Chưa có lịch sử thay đổi',
+    timeChangeDiscordSent: 'Đã gửi Discord',
+    timeChangeDiscordFailed: 'Gửi Discord thất bại',
+    btnResendDiscord: 'Gửi lại',
+    btnSaveTimeChange: 'Lưu thay đổi',
+    toastTimeChangeSaved: 'Đã đổi thời gian',
+    toastTimeChangeDiscordFail: 'Đã lưu giờ nhưng gửi Discord thất bại',
+    toastTimeChangeNeedPin: 'Nhập mật khẩu, tên người đổi và lý do',
+    toastResendOk: 'Đã gửi lại Discord',
+    toastResendFail: 'Gửi lại thất bại',
     emptyRequests: 'Chưa có yêu cầu nào',
     emptyFiltered: 'Không tìm thấy yêu cầu phù hợp',
 
@@ -2350,6 +2432,10 @@ const COMPANY_DRIVERS = ['Mr Sinh', 'Mr Duong', 'HORIE'];
 
 /** 工場ラベル（例: AHHP）。別工場では既存工場の車両マスタを自動投入しない */
 let factoryLabel = '';
+let factoryDisplayName = 'AHVN';
+/** サーバーに DISPATCHER_PIN があるときだけ時間変更UIを出す */
+let timeChangeEnabled = false;
+let timeChangeTargetId = null;
 
 function isDefaultFactory() {
   return !factoryLabel;
@@ -2432,6 +2518,8 @@ async function loadConfig() {
     const cfg = await res.json();
     const label = String(cfg.factoryLabel || '').trim();
     factoryLabel = label;
+    factoryDisplayName = String(cfg.factoryDisplayName || label || 'AHVN').trim() || 'AHVN';
+    timeChangeEnabled = Boolean(cfg.timeChangeEnabled);
     if (!label) return;
     LANGS.ja.appTitle = `配車管理システム（${label}）`;
     LANGS.vi.appTitle = `Hệ thống quản lý xe (${label})`;
@@ -2669,6 +2757,7 @@ function openRequestDetail(id) {
   if (titleEl) titleEl.textContent = `${t('detailTitle')} #${req.id}`;
 
   const body = document.getElementById('detail-modal-body');
+  const historyHtml = renderTimeChangeHistoryHtml(req);
   body.innerHTML = `
     <div class="detail-grid">
       <div class="k">ID</div><div class="v"><strong>#${req.id}</strong></div>
@@ -2683,10 +2772,14 @@ function openRequestDetail(id) {
       <div class="k">${t('detailDriver')}</div><div class="v">${escapeHtmlText(req.driver || '—')}</div>
       <div class="k">${t('labelNotes')}</div><div class="v">${escapeHtmlText(req.notes || '—')}</div>
     </div>
+    ${historyHtml}
   `;
 
   const actions = document.getElementById('detail-modal-actions');
   let btns = `<button class="btn btn-ghost btn-sm" onclick="closeRequestDetail(); focusRequestInManageList(${req.id})">${t('btnJumpManage')}</button>`;
+  if (timeChangeEnabled && req.status !== 'キャンセル') {
+    btns += `<button class="btn btn-ghost btn-sm" onclick="openTimeChangeModal(${req.id})">${t('btnTimeChange')}</button>`;
+  }
   if (req.status === '申請中') {
     btns += `<button class="btn btn-primary btn-sm" onclick="closeRequestDetail(); openAssignModal(${req.id})">${t('btnAssign')}</button>`;
     btns += `<button class="btn btn-danger btn-sm" onclick="closeRequestDetail(); cancelRequest(${req.id})">${t('btnCancel')}</button>`;
@@ -2700,6 +2793,151 @@ function openRequestDetail(id) {
   actions.innerHTML = btns;
 
   document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function renderTimeChangeHistoryHtml(req) {
+  const hist = Array.isArray(req.timeChangeHistory) ? [...req.timeChangeHistory].reverse() : [];
+  let rows = '';
+  if (!hist.length) {
+    rows = `<div style="font-size:12px;color:var(--gray-500);">${escapeHtmlText(t('timeChangeNoHistory'))}</div>`;
+  } else {
+    rows = hist.map((h) => {
+      const before = `${formatDt(h.before?.pickupDt)}${h.before?.returnDt ? ' → ' + formatDt(h.before.returnDt) : ''}`;
+      const after = `${formatDt(h.after?.pickupDt)}${h.after?.returnDt ? ' → ' + formatDt(h.after.returnDt) : ''}`;
+      const discordOk = h.discord?.status === 'sent';
+      const discordLabel = discordOk ? t('timeChangeDiscordSent') : t('timeChangeDiscordFailed');
+      const discordColor = discordOk ? '#15803d' : '#b91c1c';
+      const resendBtn = (!discordOk && timeChangeEnabled)
+        ? `<button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="resendTimeChangeDiscord(${req.id}, '${escapeHtmlAttr(h.id)}')">${t('btnResendDiscord')}</button>`
+        : '';
+      return `<div style="border:1px solid var(--gray-200,#e5e7eb);border-radius:8px;padding:10px;margin-top:8px;font-size:12px;line-height:1.5;">
+        <div><strong>${escapeHtmlText(formatDt(h.changedAt))}</strong> · ${escapeHtmlText(h.changedBy || '—')}</div>
+        <div>${escapeHtmlText(t('timeChangeBefore'))}: ${escapeHtmlText(before)}</div>
+        <div>${escapeHtmlText(t('timeChangeAfter'))}: ${escapeHtmlText(after)}</div>
+        <div>${escapeHtmlText(t('timeChangeReason'))}: ${escapeHtmlText(h.reason || '—')}</div>
+        <div style="color:${discordColor};">${escapeHtmlText(discordLabel)}${h.discord?.error && !discordOk ? ' — ' + escapeHtmlText(h.discord.error) : ''}</div>
+        ${resendBtn}
+      </div>`;
+    }).join('');
+  }
+  return `<div style="margin-top:16px;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px;">${escapeHtmlText(t('timeChangeHistory'))}</div>
+    ${rows}
+  </div>`;
+}
+
+function openTimeChangeModal(id) {
+  if (!timeChangeEnabled) return;
+  const req = state.requests.find(r => Number(r.id) === Number(id));
+  if (!req || req.status === 'キャンセル') return;
+  timeChangeTargetId = req.id;
+  document.getElementById('time-change-summary').textContent =
+    `#${req.id} · ${req.requester} · ${factoryDisplayName}`;
+  document.getElementById('tc-pickup-dt').value = isoToDatetimeLocal(req.pickupDt);
+  document.getElementById('tc-return-dt').value = isoToDatetimeLocal(req.returnDt);
+  document.getElementById('tc-reason').value = '';
+  document.getElementById('tc-pin').value = '';
+  const savedBy = localStorage.getItem('dispatchTimeChangeBy') || '';
+  document.getElementById('tc-changed-by').value = savedBy;
+  updateTimeChangePreview();
+  document.getElementById('time-change-modal').classList.remove('hidden');
+}
+
+function closeTimeChangeModal() {
+  document.getElementById('time-change-modal').classList.add('hidden');
+  timeChangeTargetId = null;
+}
+
+function updateTimeChangePreview() {
+  const req = state.requests.find(r => Number(r.id) === Number(timeChangeTargetId));
+  const el = document.getElementById('time-change-preview');
+  if (!el) return;
+  const pickup = document.getElementById('tc-pickup-dt')?.value || '';
+  const ret = document.getElementById('tc-return-dt')?.value || '';
+  const before = req
+    ? `${formatDt(req.pickupDt)}${req.returnDt ? ' → ' + formatDt(req.returnDt) : ''}`
+    : '—';
+  const after = `${formatDt(pickup)}${ret ? ' → ' + formatDt(ret) : ''}`;
+  el.innerHTML = `
+    <div><strong>${escapeHtmlText(t('timeChangeBefore'))}</strong>: ${escapeHtmlText(before)}</div>
+    <div><strong>${escapeHtmlText(t('timeChangeAfter'))}</strong>: ${escapeHtmlText(after)}</div>
+  `;
+}
+
+async function confirmTimeChange() {
+  if (!timeChangeEnabled || !timeChangeTargetId) return;
+  const pickupDt = document.getElementById('tc-pickup-dt').value;
+  const returnDt = document.getElementById('tc-return-dt').value;
+  const reason = document.getElementById('tc-reason').value.trim();
+  const changedBy = document.getElementById('tc-changed-by').value.trim();
+  const pin = document.getElementById('tc-pin').value;
+  if (!pickupDt || !reason || !changedBy || !pin) {
+    toast(t('toastTimeChangeNeedPin'), 'error');
+    return;
+  }
+  if (returnDt && returnDt <= pickupDt) {
+    toast(t('toastDateError'), 'error');
+    return;
+  }
+
+  const btn = document.getElementById('tc-save-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`/api/requests/${timeChangeTargetId}/time-change`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pickupDt, returnDt, reason, changedBy, pin }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast(data.error || t('toastSubmitError'), 'error');
+      return;
+    }
+    if (data.state) state = data.state;
+    localStorage.setItem('dispatchTimeChangeBy', changedBy);
+    const savedId = timeChangeTargetId;
+    closeTimeChangeModal();
+    renderRequests();
+    updatePendingCount();
+    if (document.getElementById('panel-schedule')?.classList.contains('active')) renderSchedule();
+    openRequestDetail(savedId);
+    if (data.discord?.status === 'sent') toast(t('toastTimeChangeSaved'), 'success');
+    else toast(t('toastTimeChangeDiscordFail'), 'error');
+  } catch {
+    toast(t('toastSubmitError'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function resendTimeChangeDiscord(reqId, historyId) {
+  if (!timeChangeEnabled) return;
+  const changedBy = window.prompt(t('timeChangeBy'), localStorage.getItem('dispatchTimeChangeBy') || '');
+  if (changedBy == null) return;
+  const pin = window.prompt(t('timeChangePin'), '');
+  if (pin == null) return;
+  if (!String(changedBy).trim() || !String(pin)) {
+    toast(t('toastTimeChangeNeedPin'), 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/requests/${reqId}/time-change/${encodeURIComponent(historyId)}/resend-discord`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changedBy: String(changedBy).trim(), pin: String(pin) }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast(data.error || t('toastResendFail'), 'error');
+      return;
+    }
+    if (data.state) state = data.state;
+    localStorage.setItem('dispatchTimeChangeBy', String(changedBy).trim());
+    openRequestDetail(reqId);
+    toast(t('toastResendOk'), 'success');
+  } catch {
+    toast(t('toastResendFail'), 'error');
+  }
 }
 
 function focusRequestInManageList(id) {
@@ -3229,6 +3467,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('edit-completed-modal').addEventListener('click', function(e) {
     if (e.target === this) closeEditCompletedModal();
+  });
+  document.getElementById('time-change-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeTimeChangeModal();
   });
   document.getElementById('detail-modal').addEventListener('click', function(e) {
     if (e.target === this) closeRequestDetail();
