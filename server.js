@@ -12,8 +12,6 @@ const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = (process.env.MONGODB_DB || 'dispatch_app').trim() || 'dispatch_app';
 /** 画面タイトル用の工場ラベル（例: AHHP）。未設定なら表示しない */
 const FACTORY_LABEL = (process.env.FACTORY_LABEL || '').trim();
-/** 配車担当者の共通パスワード（時間変更用）。未設定なら時間変更APIは使えない */
-const DISPATCHER_PIN = (process.env.DISPATCHER_PIN || '').trim();
 const FACTORY_DISPLAY_NAME = FACTORY_LABEL || 'AHVN';
 
 const INITIAL_STATE = {
@@ -181,29 +179,8 @@ function mergeTimeChangeHistory(serverHist, clientHist) {
   return [...byId.values()].sort((a, b) => String(a.changedAt).localeCompare(String(b.changedAt)));
 }
 
-function pinMatches(inputPin) {
-  if (!DISPATCHER_PIN) return false;
-  const a = Buffer.from(String(inputPin || ''), 'utf8');
-  const b = Buffer.from(DISPATCHER_PIN, 'utf8');
-  if (a.length !== b.length) return false;
-  try {
-    return require('crypto').timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
-
-function requireDispatcherAuth(body) {
-  if (!DISPATCHER_PIN) {
-    const err = new Error('時間変更機能は未設定です（DISPATCHER_PIN）');
-    err.status = 503;
-    throw err;
-  }
-  if (!pinMatches(body?.pin)) {
-    const err = new Error('パスワードが違います');
-    err.status = 403;
-    throw err;
-  }
+/** 時間変更・再送時に担当者名を必須にする（Discord通知で誰が変えたか分かるように） */
+function requireChangedBy(body) {
   const changedBy = String(body?.changedBy || '').trim();
   if (!changedBy) {
     const err = new Error('変更担当者名を入力してください');
@@ -394,7 +371,7 @@ app.get('/api/config', (req, res) => {
   res.json({
     factoryLabel: FACTORY_LABEL || null,
     factoryDisplayName: FACTORY_DISPLAY_NAME,
-    timeChangeEnabled: Boolean(DISPATCHER_PIN),
+    timeChangeEnabled: true,
   });
 });
 
@@ -567,7 +544,7 @@ app.post('/api/requests', async (req, res) => {
  */
 app.post('/api/requests/:id/time-change', async (req, res) => {
   try {
-    const changedBy = requireDispatcherAuth(req.body || {});
+    const changedBy = requireChangedBy(req.body || {});
     const id = Number.parseInt(req.params.id, 10);
     if (!Number.isFinite(id) || id < 1) {
       return res.status(400).json({ error: '不正な依頼番号です' });
@@ -666,7 +643,7 @@ app.post('/api/requests/:id/time-change', async (req, res) => {
 /** Discord 通知の再送（sent 済みは重複防止のため拒否） */
 app.post('/api/requests/:id/time-change/:historyId/resend-discord', async (req, res) => {
   try {
-    requireDispatcherAuth(req.body || {});
+    requireChangedBy(req.body || {});
     const id = Number.parseInt(req.params.id, 10);
     const historyId = String(req.params.historyId || '').trim();
     if (!Number.isFinite(id) || id < 1 || !historyId) {
@@ -806,11 +783,7 @@ async function start() {
     if (DISCORD_WEBHOOK_URL) {
       console.log('  Discord: 新規依頼・時間変更時に Webhook 通知を送ります');
     }
-    if (DISPATCHER_PIN) {
-      console.log('  時間変更: DISPATCHER_PIN 設定済み（担当者パスワード必須）');
-    } else {
-      console.log('  時間変更: DISPATCHER_PIN 未設定のため無効');
-    }
+    console.log('  時間変更: 有効（担当者名・変更理由を記録し Discord 通知）');
     console.log('========================================\n');
   });
 

@@ -1028,13 +1028,9 @@
           <label data-i18n="timeChangeReason">変更理由</label>
           <textarea id="tc-reason" rows="2" data-i18n-ph="timeChangeReasonPh" placeholder="例：車両スケジュール調整"></textarea>
         </div>
-        <div class="form-group">
+        <div class="form-group full">
           <label data-i18n="timeChangeBy">変更担当者</label>
           <input type="text" id="tc-changed-by" data-i18n-ph="timeChangeByPh" placeholder="例：THAO" autocomplete="username" />
-        </div>
-        <div class="form-group">
-          <label data-i18n="timeChangePin">担当者パスワード</label>
-          <input type="password" id="tc-pin" data-i18n-ph="timeChangePinPh" placeholder="配車担当者用パスワード" autocomplete="current-password" />
         </div>
       </div>
       <div id="time-change-preview" style="margin-top:14px;padding:12px;background:var(--gray-50,#f9fafb);border-radius:8px;font-size:13px;line-height:1.6;"></div>
@@ -1126,8 +1122,6 @@ const LANGS = {
     timeChangeReasonPh: '例：車両スケジュール調整',
     timeChangeBy: '変更担当者',
     timeChangeByPh: '例：THAO',
-    timeChangePin: '担当者パスワード',
-    timeChangePinPh: '配車担当者用パスワード',
     timeChangeBefore: '変更前',
     timeChangeAfter: '変更後',
     timeChangeHistory: '時間変更履歴',
@@ -1138,7 +1132,7 @@ const LANGS = {
     btnSaveTimeChange: '変更を保存',
     toastTimeChangeSaved: '時間を変更しました',
     toastTimeChangeDiscordFail: '時間は保存しましたが、Discord通知に失敗しました',
-    toastTimeChangeNeedPin: 'パスワードと担当者名・理由を入力してください',
+    toastTimeChangeNeedFields: '担当者名と変更理由を入力してください',
     toastResendOk: 'Discordへ再送しました',
     toastResendFail: '再送に失敗しました',
     emptyRequests: '依頼はまだありません',
@@ -1306,8 +1300,6 @@ const LANGS = {
     timeChangeReasonPh: 'VD: Điều chỉnh lịch xe',
     timeChangeBy: 'Người thay đổi',
     timeChangeByPh: 'VD: THAO',
-    timeChangePin: 'Mật khẩu điều phối',
-    timeChangePinPh: 'Mật khẩu dành cho điều phối',
     timeChangeBefore: 'Trước khi đổi',
     timeChangeAfter: 'Sau khi đổi',
     timeChangeHistory: 'Lịch sử đổi giờ',
@@ -1318,7 +1310,7 @@ const LANGS = {
     btnSaveTimeChange: 'Lưu thay đổi',
     toastTimeChangeSaved: 'Đã đổi thời gian',
     toastTimeChangeDiscordFail: 'Đã lưu giờ nhưng gửi Discord thất bại',
-    toastTimeChangeNeedPin: 'Nhập mật khẩu, tên người đổi và lý do',
+    toastTimeChangeNeedFields: 'Nhập tên người đổi và lý do',
     toastResendOk: 'Đã gửi lại Discord',
     toastResendFail: 'Gửi lại thất bại',
     emptyRequests: 'Chưa có yêu cầu nào',
@@ -2433,8 +2425,8 @@ const COMPANY_DRIVERS = ['Mr Sinh', 'Mr Duong', 'HORIE'];
 /** 工場ラベル（例: AHHP）。別工場では既存工場の車両マスタを自動投入しない */
 let factoryLabel = '';
 let factoryDisplayName = 'AHVN';
-/** サーバーに DISPATCHER_PIN があるときだけ時間変更UIを出す */
-let timeChangeEnabled = false;
+/** 時間変更UIを出すか（常に有効。Discordで変更理由を共有する運用） */
+let timeChangeEnabled = true;
 let timeChangeTargetId = null;
 
 function isDefaultFactory() {
@@ -2836,7 +2828,6 @@ function openTimeChangeModal(id) {
   document.getElementById('tc-pickup-dt').value = isoToDatetimeLocal(req.pickupDt);
   document.getElementById('tc-return-dt').value = isoToDatetimeLocal(req.returnDt);
   document.getElementById('tc-reason').value = '';
-  document.getElementById('tc-pin').value = '';
   const savedBy = localStorage.getItem('dispatchTimeChangeBy') || '';
   document.getElementById('tc-changed-by').value = savedBy;
   updateTimeChangePreview();
@@ -2870,9 +2861,8 @@ async function confirmTimeChange() {
   const returnDt = document.getElementById('tc-return-dt').value;
   const reason = document.getElementById('tc-reason').value.trim();
   const changedBy = document.getElementById('tc-changed-by').value.trim();
-  const pin = document.getElementById('tc-pin').value;
-  if (!pickupDt || !reason || !changedBy || !pin) {
-    toast(t('toastTimeChangeNeedPin'), 'error');
+  if (!pickupDt || !reason || !changedBy) {
+    toast(t('toastTimeChangeNeedFields'), 'error');
     return;
   }
   if (returnDt && returnDt <= pickupDt) {
@@ -2886,7 +2876,7 @@ async function confirmTimeChange() {
     const res = await fetch(`/api/requests/${timeChangeTargetId}/time-change`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pickupDt, returnDt, reason, changedBy, pin }),
+      body: JSON.stringify({ pickupDt, returnDt, reason, changedBy }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -2914,17 +2904,15 @@ async function resendTimeChangeDiscord(reqId, historyId) {
   if (!timeChangeEnabled) return;
   const changedBy = window.prompt(t('timeChangeBy'), localStorage.getItem('dispatchTimeChangeBy') || '');
   if (changedBy == null) return;
-  const pin = window.prompt(t('timeChangePin'), '');
-  if (pin == null) return;
-  if (!String(changedBy).trim() || !String(pin)) {
-    toast(t('toastTimeChangeNeedPin'), 'error');
+  if (!String(changedBy).trim()) {
+    toast(t('toastTimeChangeNeedFields'), 'error');
     return;
   }
   try {
     const res = await fetch(`/api/requests/${reqId}/time-change/${encodeURIComponent(historyId)}/resend-discord`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ changedBy: String(changedBy).trim(), pin: String(pin) }),
+      body: JSON.stringify({ changedBy: String(changedBy).trim() }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
